@@ -1,0 +1,281 @@
+import { useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useLabelStore } from '@/store/labelStore';
+import { PAPER_SIZES } from '@/types/label';
+import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
+
+const MM_TO_PX = 2; // Reduced scale for preview
+
+export function SheetPreview() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const {
+    sheetConfig,
+    elements,
+    sequentialConfig,
+    csvData,
+    dataMode,
+    previewPage,
+    setPreviewPage,
+    zoom
+  } = useLabelStore();
+
+  const paper = PAPER_SIZES[sheetConfig.paperSize] || {
+    width: sheetConfig.customWidth,
+    height: sheetConfig.customHeight,
+  };
+
+  const labelsPerPage = sheetConfig.columns * sheetConfig.rows;
+  const totalLabels = dataMode === 'sequential'
+    ? Math.ceil((sequentialConfig.end - sequentialConfig.start + 1) / sequentialConfig.step)
+    : csvData.length || 1;
+  const totalPages = Math.max(1, Math.ceil(totalLabels / labelsPerPage));
+
+  const generateLabelData = useCallback((index: number) => {
+    if (dataMode === 'sequential') {
+      const num = sequentialConfig.start + index * sequentialConfig.step;
+      return {
+        numero: num.toString().padStart(sequentialConfig.padLength, '0'),
+        prefixo: sequentialConfig.prefix,
+        sufixo: sequentialConfig.suffix,
+        custom: {},
+      };
+    } else if (csvData[index]) {
+      return {
+        numero: csvData[index]['NUMERO'] || csvData[index]['numero'] || (index + 1).toString(),
+        prefixo: csvData[index]['PREFIXO'] || csvData[index]['prefixo'] || '',
+        sufixo: csvData[index]['SUFIXO'] || csvData[index]['sufixo'] || '',
+        custom: csvData[index],
+      };
+    }
+    return {
+      numero: (index + 1).toString().padStart(6, '0'),
+      prefixo: '',
+      sufixo: '',
+      custom: {},
+    };
+  }, [dataMode, sequentialConfig, csvData]);
+
+  const renderPreview = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const paperWidthPx = paper.width * MM_TO_PX;
+    const paperHeightPx = paper.height * MM_TO_PX;
+
+    canvas.width = paperWidthPx;
+    canvas.height = paperHeightPx;
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, paperWidthPx, paperHeightPx);
+
+    // Draw margins (subtle guides)
+    ctx.strokeStyle = '#e5e5e5';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([2, 2]);
+    ctx.strokeRect(
+      sheetConfig.marginLeft * MM_TO_PX,
+      sheetConfig.marginTop * MM_TO_PX,
+      (paper.width - sheetConfig.marginLeft - sheetConfig.marginRight) * MM_TO_PX,
+      (paper.height - sheetConfig.marginTop - sheetConfig.marginBottom) * MM_TO_PX
+    );
+    ctx.setLineDash([]);
+
+    // Draw labels grid
+    const startLabelIndex = (previewPage - 1) * labelsPerPage;
+
+    for (let row = 0; row < sheetConfig.rows; row++) {
+      for (let col = 0; col < sheetConfig.columns; col++) {
+        const labelIndex = startLabelIndex + row * sheetConfig.columns + col;
+        if (labelIndex >= totalLabels) continue;
+
+        const labelX = (sheetConfig.marginLeft + col * (sheetConfig.labelWidth + sheetConfig.spacingHorizontal)) * MM_TO_PX;
+        const labelY = (sheetConfig.marginTop + row * (sheetConfig.labelHeight + sheetConfig.spacingVertical)) * MM_TO_PX;
+        const labelWidth = sheetConfig.labelWidth * MM_TO_PX;
+        const labelHeight = sheetConfig.labelHeight * MM_TO_PX;
+
+        // Label background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
+
+        // Label border
+        ctx.strokeStyle = '#d1d5db';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(labelX, labelY, labelWidth, labelHeight);
+
+        // Generate data for this label
+        const labelData = generateLabelData(labelIndex);
+
+        // Draw elements
+        const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
+
+        for (const element of sortedElements) {
+          const elemX = labelX + element.x * MM_TO_PX;
+          const elemY = labelY + element.y * MM_TO_PX;
+          const elemWidth = element.width * MM_TO_PX;
+          const elemHeight = element.height * MM_TO_PX;
+
+          ctx.globalAlpha = element.opacity;
+
+          switch (element.type) {
+            case 'text': {
+              let text = element.text || '';
+              if (element.isDynamic) {
+                text = replaceDynamicFields(text, labelData);
+              }
+
+              const fontSize = (element.fontSize || 12) * (MM_TO_PX / 3.78);
+              ctx.font = `${element.fontStyle === 'italic' ? 'italic ' : ''}${element.fontWeight === 'bold' ? 'bold ' : ''}${fontSize}px ${element.fontFamily || 'Arial'}`;
+              ctx.fillStyle = element.fill || '#000000';
+              ctx.textAlign = (element.textAlign as CanvasTextAlign) || 'left';
+              ctx.textBaseline = 'middle';
+
+              const textX = element.textAlign === 'center' ? elemX + elemWidth / 2 :
+                           element.textAlign === 'right' ? elemX + elemWidth : elemX;
+              ctx.fillText(text, textX, elemY + elemHeight / 2, elemWidth);
+              break;
+            }
+
+            case 'rectangle': {
+              if (element.shapeFill && element.shapeFill !== 'transparent') {
+                ctx.fillStyle = element.shapeFill;
+                ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
+              }
+              if (element.shapeStroke) {
+                ctx.strokeStyle = element.shapeStroke;
+                ctx.lineWidth = element.shapeStrokeWidth || 1;
+                ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
+              }
+              break;
+            }
+
+            case 'circle': {
+              ctx.beginPath();
+              ctx.ellipse(elemX + elemWidth / 2, elemY + elemHeight / 2, elemWidth / 2, elemHeight / 2, 0, 0, Math.PI * 2);
+              if (element.shapeFill && element.shapeFill !== 'transparent') {
+                ctx.fillStyle = element.shapeFill;
+                ctx.fill();
+              }
+              if (element.shapeStroke) {
+                ctx.strokeStyle = element.shapeStroke;
+                ctx.lineWidth = element.shapeStrokeWidth || 1;
+                ctx.stroke();
+              }
+              break;
+            }
+
+            case 'line': {
+              ctx.beginPath();
+              ctx.moveTo(elemX, elemY + elemHeight / 2);
+              ctx.lineTo(elemX + elemWidth, elemY + elemHeight / 2);
+              ctx.strokeStyle = element.shapeStroke || '#000000';
+              ctx.lineWidth = element.shapeStrokeWidth || 1;
+              ctx.stroke();
+              break;
+            }
+
+            case 'qrcode': {
+              // Simplified QR placeholder for preview
+              ctx.fillStyle = '#000000';
+              ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(elemX + 2, elemY + 2, elemWidth - 4, elemHeight - 4);
+              ctx.fillStyle = '#000000';
+              ctx.font = '6px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('QR', elemX + elemWidth / 2, elemY + elemHeight / 2 + 2);
+              break;
+            }
+
+            case 'barcode':
+            case 'datamatrix':
+            case 'pdf417': {
+              // Simplified barcode placeholder for preview
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 0.5;
+              ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
+              
+              // Draw bars pattern
+              const barWidth = elemWidth / 30;
+              ctx.fillStyle = '#000000';
+              for (let i = 0; i < 15; i++) {
+                if (Math.random() > 0.3) {
+                  ctx.fillRect(elemX + i * barWidth * 2, elemY + 2, barWidth, elemHeight - 4);
+                }
+              }
+              break;
+            }
+
+            case 'image': {
+              // Image placeholder
+              ctx.fillStyle = '#f3f4f6';
+              ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
+              ctx.strokeStyle = '#9ca3af';
+              ctx.lineWidth = 0.5;
+              ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
+              ctx.fillStyle = '#9ca3af';
+              ctx.font = '6px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('IMG', elemX + elemWidth / 2, elemY + elemHeight / 2 + 2);
+              break;
+            }
+          }
+
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+  }, [paper, sheetConfig, elements, previewPage, labelsPerPage, totalLabels, generateLabelData]);
+
+  useEffect(() => {
+    renderPreview();
+  }, [renderPreview]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between p-2 border-b border-border">
+        <span className="text-xs font-medium">Preview da Chapa</span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setPreviewPage(Math.max(1, previewPage - 1))}
+            disabled={previewPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs">
+            {previewPage} / {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setPreviewPage(Math.min(totalPages, previewPage + 1))}
+            disabled={previewPage >= totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/20">
+        <div
+          className="shadow-lg"
+          style={{
+            transform: `scale(${Math.min(zoom / 100, 1)})`,
+            transformOrigin: 'center center',
+          }}
+        >
+          <canvas ref={canvasRef} className="border border-border" />
+        </div>
+      </div>
+    </div>
+  );
+}
