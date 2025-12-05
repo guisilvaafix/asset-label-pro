@@ -16,21 +16,48 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
-  const { sheetConfig, elements, exportConfig, setExportConfig, dataMode, sequentialConfig, csvData } = useLabelStore();
+  const { sheetConfig, elements, exportConfig, setExportConfig, csvData } = useLabelStore();
   const [isExporting, setIsExporting] = useState(false);
 
-  const generateLabelDataList = () => {
-    const list = [];
-    if (dataMode === 'sequential') {
-      for (let i = sequentialConfig.start; i <= sequentialConfig.end; i += sequentialConfig.step) {
-        list.push({
-          numero: i.toString().padStart(sequentialConfig.padLength, '0'),
-          prefixo: sequentialConfig.prefix,
-          sufixo: sequentialConfig.suffix,
-          custom: {},
-        });
+  // Calculate total labels based on elements
+  const calculateTotalLabels = () => {
+    let maxLabels = 0;
+    
+    for (const element of elements) {
+      if (element.dataSourceType === 'sequential' && element.customSequence) {
+        const count = Math.ceil((element.customSequence.end - element.customSequence.start + 1) / element.customSequence.step);
+        maxLabels = Math.max(maxLabels, count);
+      } else if (element.dataSourceType === 'csv') {
+        maxLabels = Math.max(maxLabels, csvData.length);
       }
-    } else {
+    }
+    
+    // If no sequential/csv elements, default to 1
+    return maxLabels || 1;
+  };
+
+  const generateLabelDataList = () => {
+    const totalLabels = calculateTotalLabels();
+    const list = [];
+    
+    // Find the maximum sequence to generate
+    let maxSequence = { start: 1, end: totalLabels, step: 1, padLength: 6, prefix: '', suffix: '' };
+    
+    for (const element of elements) {
+      if (element.dataSourceType === 'sequential' && element.customSequence) {
+        const seq = element.customSequence;
+        const count = Math.ceil((seq.end - seq.start + 1) / seq.step);
+        if (count > maxSequence.end) {
+          maxSequence = seq;
+        }
+      }
+    }
+    
+    // Generate labels based on max sequence or CSV
+    const hasCsvElements = elements.some(el => el.dataSourceType === 'csv');
+    
+    if (hasCsvElements && csvData.length > 0) {
+      // Use CSV data
       for (const row of csvData) {
         list.push({
           numero: row['NUMERO'] || row['numero'] || '000001',
@@ -39,7 +66,19 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
           custom: row,
         });
       }
+    } else {
+      // Generate sequential data
+      for (let i = 0; i < totalLabels; i++) {
+        const num = maxSequence.start + i * maxSequence.step;
+        list.push({
+          numero: num.toString().padStart(maxSequence.padLength, '0'),
+          prefixo: maxSequence.prefix,
+          sufixo: maxSequence.suffix,
+          custom: {},
+        });
+      }
     }
+    
     return list;
   };
 
@@ -53,17 +92,26 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
         return;
       }
 
+      // Get default sequence from first sequential element or create default
+      let defaultSequence = { start: 1, end: 100, step: 1, padLength: 6, prefix: '', suffix: '' };
+      for (const element of elements) {
+        if (element.dataSourceType === 'sequential' && element.customSequence) {
+          defaultSequence = element.customSequence;
+          break;
+        }
+      }
+
       switch (exportConfig.format) {
         case 'pdf':
-          await exportToPDF(sheetConfig, elements, labelDataList, exportConfig);
+          await exportToPDF(sheetConfig, elements, labelDataList, exportConfig, defaultSequence);
           toast.success(`PDF exportado com ${labelDataList.length} etiquetas`);
           break;
         case 'pdf-single':
-          await exportToPDFSingle(sheetConfig, elements, labelDataList, exportConfig);
+          await exportToPDFSingle(sheetConfig, elements, labelDataList, exportConfig, defaultSequence);
           toast.success(`PDF individual exportado com ${labelDataList.length} páginas`);
           break;
         case 'png':
-          await exportToPNG(sheetConfig, elements, labelDataList, exportConfig);
+          await exportToPNG(sheetConfig, elements, labelDataList, exportConfig, defaultSequence);
           toast.success(`ZIP com ${labelDataList.length} imagens PNG exportado`);
           break;
       }

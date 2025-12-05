@@ -40,7 +40,7 @@ const Index = () => {
             </div>
             
             {/* Sheet Preview */}
-            <div className="w-80 border-l border-border flex flex-col bg-card">
+            <div className="w-[500px] border-l border-border flex flex-col bg-card">
               <SheetPreview />
             </div>
           </div>

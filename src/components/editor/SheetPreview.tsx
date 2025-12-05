@@ -1,11 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { useLabelStore } from '@/store/labelStore';
 import { PAPER_SIZES } from '@/types/label';
-import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
 
-const MM_TO_PX = 2; // Reduced scale for preview
+const MM_TO_PX = 4; // Higher quality scale for preview
 
 export function SheetPreview() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -17,7 +17,8 @@ export function SheetPreview() {
     dataMode,
     previewPage,
     setPreviewPage,
-    zoom
+    previewZoom,
+    setPreviewZoom,
   } = useLabelStore();
 
   const paper = PAPER_SIZES[sheetConfig.paperSize] || {
@@ -31,32 +32,8 @@ export function SheetPreview() {
     : csvData.length || 1;
   const totalPages = Math.max(1, Math.ceil(totalLabels / labelsPerPage));
 
-  const generateLabelData = useCallback((index: number) => {
-    if (dataMode === 'sequential') {
-      const num = sequentialConfig.start + index * sequentialConfig.step;
-      return {
-        numero: num.toString().padStart(sequentialConfig.padLength, '0'),
-        prefixo: sequentialConfig.prefix,
-        sufixo: sequentialConfig.suffix,
-        custom: {},
-      };
-    } else if (csvData[index]) {
-      return {
-        numero: csvData[index]['NUMERO'] || csvData[index]['numero'] || (index + 1).toString(),
-        prefixo: csvData[index]['PREFIXO'] || csvData[index]['prefixo'] || '',
-        sufixo: csvData[index]['SUFIXO'] || csvData[index]['sufixo'] || '',
-        custom: csvData[index],
-      };
-    }
-    return {
-      numero: (index + 1).toString().padStart(6, '0'),
-      prefixo: '',
-      sufixo: '',
-      custom: {},
-    };
-  }, [dataMode, sequentialConfig, csvData]);
-
-  const renderPreview = useCallback(async () => {
+  // Render blueprint (simplified preview)
+  const renderBlueprint = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -74,9 +51,9 @@ export function SheetPreview() {
     ctx.fillRect(0, 0, paperWidthPx, paperHeightPx);
 
     // Draw margins (subtle guides)
-    ctx.strokeStyle = '#e5e5e5';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
     ctx.strokeRect(
       sheetConfig.marginLeft * MM_TO_PX,
       sheetConfig.marginTop * MM_TO_PX,
@@ -103,14 +80,11 @@ export function SheetPreview() {
         ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
 
         // Label border
-        ctx.strokeStyle = '#d1d5db';
-        ctx.lineWidth = 0.5;
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.5;
         ctx.strokeRect(labelX, labelY, labelWidth, labelHeight);
 
-        // Generate data for this label
-        const labelData = generateLabelData(labelIndex);
-
-        // Draw elements
+        // Draw element outlines (blueprint style)
         const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
 
         for (const element of sortedElements) {
@@ -119,35 +93,119 @@ export function SheetPreview() {
           const elemWidth = element.width * MM_TO_PX;
           const elemHeight = element.height * MM_TO_PX;
 
-          ctx.globalAlpha = element.opacity;
+          ctx.globalAlpha = element.opacity * 0.7; // More visible for better clarity
 
+          // Draw outline based on element type - all in black
           switch (element.type) {
             case 'text': {
-              let text = element.text || '';
-              if (element.isDynamic) {
-                text = replaceDynamicFields(text, labelData);
-              }
-
-              const fontSize = (element.fontSize || 12) * (MM_TO_PX / 3.78);
-              ctx.font = `${element.fontStyle === 'italic' ? 'italic ' : ''}${element.fontWeight === 'bold' ? 'bold ' : ''}${fontSize}px ${element.fontFamily || 'Arial'}`;
-              ctx.fillStyle = element.fill || '#000000';
-              ctx.textAlign = (element.textAlign as CanvasTextAlign) || 'left';
+              // Draw text box outline
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([2, 2]);
+              ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
+              ctx.setLineDash([]);
+              
+              // Draw text label with better quality
+              ctx.fillStyle = '#000000';
+              const fontSize = Math.max(8, Math.min(12, (element.fontSize || 12) * (MM_TO_PX / 3.78) * 0.7));
+              ctx.font = `${element.fontWeight === 'bold' ? 'bold ' : ''}${fontSize}px ${element.fontFamily || 'Arial'}`;
+              ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
+              const text = element.text?.substring(0, 15) || 'Texto';
+              ctx.fillText(text, elemX + elemWidth / 2, elemY + elemHeight / 2);
+              break;
+            }
 
-              const textX = element.textAlign === 'center' ? elemX + elemWidth / 2 :
-                           element.textAlign === 'right' ? elemX + elemWidth : elemX;
-              ctx.fillText(text, textX, elemY + elemHeight / 2, elemWidth);
+            case 'qrcode': {
+              // Draw QR code placeholder with pattern
+              // Indicação visual se tem sequência personalizada
+              if (element.useCustomSequence) {
+                ctx.strokeStyle = '#8b5cf6';
+                ctx.lineWidth = 2.5;
+              } else {
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+              }
+              ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
+              
+              // Draw QR pattern (simplified) in black
+              ctx.fillStyle = element.useCustomSequence ? '#8b5cf6' : '#000000';
+              const moduleSize = Math.max(1.5, Math.min(4, elemWidth / 20));
+              for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < 7; j++) {
+                  if ((i === 0 || i === 6 || j === 0 || j === 6) || 
+                      ((i === 2 || i === 4) && (j === 2 || j === 4))) {
+                    ctx.fillRect(
+                      elemX + i * moduleSize * 3,
+                      elemY + j * moduleSize * 3,
+                      moduleSize * 2,
+                      moduleSize * 2
+                    );
+                  }
+                }
+              }
+              
+              ctx.font = 'bold 8px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('QR', elemX + elemWidth / 2, elemY + elemHeight / 2);
+              break;
+            }
+
+            case 'barcode':
+            case 'datamatrix':
+            case 'pdf417': {
+              // Draw barcode placeholder with better pattern
+              // Indicação visual se tem sequência personalizada
+              if (element.useCustomSequence) {
+                ctx.strokeStyle = '#8b5cf6';
+                ctx.lineWidth = 2.5;
+              } else {
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+              }
+              ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
+              
+              // Draw more detailed bars pattern
+              ctx.fillStyle = element.useCustomSequence ? '#8b5cf6' : '#000000';
+              const barWidth = Math.max(1.5, elemWidth / 20);
+              const numBars = Math.floor(elemWidth / (barWidth * 2));
+              for (let i = 0; i < numBars; i++) {
+                // Vary bar heights for more realistic look
+                const barHeight = elemHeight * (0.6 + (i % 3) * 0.15);
+                const barY = elemY + (elemHeight - barHeight) / 2;
+                if (i % 2 === 0 || (i % 3 === 0)) {
+                  ctx.fillRect(elemX + i * barWidth * 2, barY, barWidth, barHeight);
+                }
+              }
               break;
             }
 
             case 'rectangle': {
               if (element.shapeFill && element.shapeFill !== 'transparent') {
-                ctx.fillStyle = element.shapeFill;
+                ctx.fillStyle = '#000000';
+                ctx.globalAlpha = element.opacity * 0.15;
                 ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
               }
-              if (element.shapeStroke) {
-                ctx.strokeStyle = element.shapeStroke;
-                ctx.lineWidth = element.shapeStrokeWidth || 1;
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 2;
+              ctx.globalAlpha = element.opacity * 0.8;
+              if (element.cornerRadius && element.cornerRadius > 0) {
+                const radius = element.cornerRadius * MM_TO_PX;
+                ctx.beginPath();
+                // Draw rounded rectangle manually for compatibility
+                ctx.moveTo(elemX + radius, elemY);
+                ctx.lineTo(elemX + elemWidth - radius, elemY);
+                ctx.quadraticCurveTo(elemX + elemWidth, elemY, elemX + elemWidth, elemY + radius);
+                ctx.lineTo(elemX + elemWidth, elemY + elemHeight - radius);
+                ctx.quadraticCurveTo(elemX + elemWidth, elemY + elemHeight, elemX + elemWidth - radius, elemY + elemHeight);
+                ctx.lineTo(elemX + radius, elemY + elemHeight);
+                ctx.quadraticCurveTo(elemX, elemY + elemHeight, elemX, elemY + elemHeight - radius);
+                ctx.lineTo(elemX, elemY + radius);
+                ctx.quadraticCurveTo(elemX, elemY, elemX + radius, elemY);
+                ctx.closePath();
+                ctx.stroke();
+              } else {
                 ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
               }
               break;
@@ -157,14 +215,14 @@ export function SheetPreview() {
               ctx.beginPath();
               ctx.ellipse(elemX + elemWidth / 2, elemY + elemHeight / 2, elemWidth / 2, elemHeight / 2, 0, 0, Math.PI * 2);
               if (element.shapeFill && element.shapeFill !== 'transparent') {
-                ctx.fillStyle = element.shapeFill;
+                ctx.fillStyle = '#000000';
+                ctx.globalAlpha = element.opacity * 0.15;
                 ctx.fill();
               }
-              if (element.shapeStroke) {
-                ctx.strokeStyle = element.shapeStroke;
-                ctx.lineWidth = element.shapeStrokeWidth || 1;
-                ctx.stroke();
-              }
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 2;
+              ctx.globalAlpha = element.opacity * 0.8;
+              ctx.stroke();
               break;
             }
 
@@ -172,57 +230,27 @@ export function SheetPreview() {
               ctx.beginPath();
               ctx.moveTo(elemX, elemY + elemHeight / 2);
               ctx.lineTo(elemX + elemWidth, elemY + elemHeight / 2);
-              ctx.strokeStyle = element.shapeStroke || '#000000';
-              ctx.lineWidth = element.shapeStrokeWidth || 1;
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = Math.max(2, (element.shapeStrokeWidth || 1) * MM_TO_PX / 3.78);
+              ctx.globalAlpha = element.opacity * 0.8;
               ctx.stroke();
               break;
             }
 
-            case 'qrcode': {
-              // Simplified QR placeholder for preview
-              ctx.fillStyle = '#000000';
-              ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(elemX + 2, elemY + 2, elemWidth - 4, elemHeight - 4);
-              ctx.fillStyle = '#000000';
-              ctx.font = '6px Arial';
-              ctx.textAlign = 'center';
-              ctx.fillText('QR', elemX + elemWidth / 2, elemY + elemHeight / 2 + 2);
-              break;
-            }
-
-            case 'barcode':
-            case 'datamatrix':
-            case 'pdf417': {
-              // Simplified barcode placeholder for preview
-              ctx.fillStyle = '#ffffff';
+            case 'image': {
+              // Image placeholder with better quality
+              ctx.fillStyle = '#f5f5f5';
               ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
               ctx.strokeStyle = '#000000';
-              ctx.lineWidth = 0.5;
+              ctx.lineWidth = 2;
+              ctx.setLineDash([3, 3]);
               ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
-              
-              // Draw bars pattern
-              const barWidth = elemWidth / 30;
+              ctx.setLineDash([]);
               ctx.fillStyle = '#000000';
-              for (let i = 0; i < 15; i++) {
-                if (Math.random() > 0.3) {
-                  ctx.fillRect(elemX + i * barWidth * 2, elemY + 2, barWidth, elemHeight - 4);
-                }
-              }
-              break;
-            }
-
-            case 'image': {
-              // Image placeholder
-              ctx.fillStyle = '#f3f4f6';
-              ctx.fillRect(elemX, elemY, elemWidth, elemHeight);
-              ctx.strokeStyle = '#9ca3af';
-              ctx.lineWidth = 0.5;
-              ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
-              ctx.fillStyle = '#9ca3af';
-              ctx.font = '6px Arial';
+              ctx.font = 'bold 8px Arial';
               ctx.textAlign = 'center';
-              ctx.fillText('IMG', elemX + elemWidth / 2, elemY + elemHeight / 2 + 2);
+              ctx.textBaseline = 'middle';
+              ctx.fillText('IMG', elemX + elemWidth / 2, elemY + elemHeight / 2);
               break;
             }
           }
@@ -231,11 +259,11 @@ export function SheetPreview() {
         }
       }
     }
-  }, [paper, sheetConfig, elements, previewPage, labelsPerPage, totalLabels, generateLabelData]);
+  }, [paper, sheetConfig, elements, previewPage, labelsPerPage, totalLabels]);
 
   useEffect(() => {
-    renderPreview();
-  }, [renderPreview]);
+    renderBlueprint();
+  }, [renderBlueprint]);
 
   return (
     <div className="flex flex-col h-full">
@@ -251,7 +279,7 @@ export function SheetPreview() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-xs">
+          <span className="text-xs min-w-[3rem] text-center">
             {previewPage} / {totalPages}
           </span>
           <Button
@@ -265,11 +293,26 @@ export function SheetPreview() {
           </Button>
         </div>
       </div>
+      
+      <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-muted/30">
+        <ZoomOut className="h-3 w-3 text-muted-foreground" />
+        <Slider
+          value={[previewZoom]}
+          onValueChange={([value]) => setPreviewZoom(value)}
+          min={10}
+          max={200}
+          step={5}
+          className="flex-1"
+        />
+        <ZoomIn className="h-3 w-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground w-10 text-right">{previewZoom}%</span>
+      </div>
+
       <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/20">
         <div
           className="shadow-lg"
           style={{
-            transform: `scale(${Math.min(zoom / 100, 1)})`,
+            transform: `scale(${previewZoom / 100})`,
             transformOrigin: 'center center',
           }}
         >

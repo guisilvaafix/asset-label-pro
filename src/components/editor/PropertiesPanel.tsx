@@ -13,6 +13,7 @@ import {
   Bold,
   Italic
 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +24,7 @@ import { Switch } from '@/components/ui/switch';
 import { Toggle } from '@/components/ui/toggle';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLabelStore } from '@/store/labelStore';
-import { BARCODE_TYPES, DYNAMIC_FIELDS } from '@/types/label';
+import { BARCODE_TYPES, DYNAMIC_FIELDS, SequentialConfig } from '@/types/label';
 
 const FONT_FAMILIES = [
   'Arial',
@@ -43,18 +44,73 @@ export function PropertiesPanel() {
     updateElement, 
     removeElement, 
     duplicateElement,
-    moveElementLayer 
+    moveElementLayer,
+    sequentialConfig,
+    csvHeaders
   } = useLabelStore();
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
+  
+  // Estado local para inputs (evita re-renderização e perda de foco)
+  const [localValues, setLocalValues] = useState<Record<string, string | number>>({});
+  const updateTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+  
+  // Sincronizar estado local quando o elemento muda
+  useEffect(() => {
+    if (selectedElement) {
+      setLocalValues({
+        x: selectedElement.x,
+        y: selectedElement.y,
+        width: selectedElement.width,
+        height: selectedElement.height,
+        text: selectedElement.text || '',
+        qrValue: selectedElement.qrValue || '',
+        barcodeValue: selectedElement.barcodeValue || '',
+        fill: selectedElement.fill || '#000000',
+        qrForeground: selectedElement.qrForeground || '#000000',
+        qrBackground: selectedElement.qrBackground || '#ffffff',
+        shapeFill: selectedElement.shapeFill || '#ffffff',
+        shapeStroke: selectedElement.shapeStroke || '#000000',
+        prefix: selectedElement.customSequence?.prefix || '',
+        suffix: selectedElement.customSequence?.suffix || '',
+      });
+    }
+  }, [selectedElement?.id]); // Apenas quando o ID muda, não quando os valores mudam
+  
+  // Limpar timeouts ao desmontar ou mudar elemento
+  useEffect(() => {
+    return () => {
+      Object.values(updateTimeoutRef.current).forEach(timeout => clearTimeout(timeout));
+    };
+  }, [selectedElement?.id]);
+  
+  // Função para atualizar com debounce
+  const updateWithDebounce = useCallback((key: string, value: string | number, finalUpdate: (val: any) => void, delay: number = 300) => {
+    setLocalValues(prev => ({ ...prev, [key]: value }));
+    
+    if (updateTimeoutRef.current[key]) {
+      clearTimeout(updateTimeoutRef.current[key]);
+    }
+    
+    updateTimeoutRef.current[key] = setTimeout(() => {
+      finalUpdate(value);
+    }, delay);
+  }, []);
+  
+  // Função para atualizar imediatamente (sem debounce)
+  const updateImmediate = useCallback((updates: Partial<typeof selectedElement>) => {
+    if (selectedElement) {
+      updateElement(selectedElement.id, updates);
+    }
+  }, [selectedElement, updateElement]);
 
   if (!selectedElement) {
     return (
-      <aside className="w-72 border-l border-border bg-card flex flex-col">
-        <div className="p-4 border-b border-border">
+      <aside className="w-72 border-l border-border bg-card flex flex-col h-full overflow-hidden">
+        <div className="p-4 border-b border-border flex-shrink-0">
           <h2 className="font-semibold">Propriedades</h2>
         </div>
-        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
           <p className="text-sm text-muted-foreground text-center">
             Selecione um elemento no canvas para editar suas propriedades
           </p>
@@ -63,13 +119,15 @@ export function PropertiesPanel() {
     );
   }
 
-  const update = (updates: Partial<typeof selectedElement>) => {
-    updateElement(selectedElement.id, updates);
-  };
+  const update = useCallback((updates: Partial<typeof selectedElement>) => {
+    if (selectedElement) {
+      updateElement(selectedElement.id, updates);
+    }
+  }, [selectedElement, updateElement]);
 
   return (
-    <aside className="w-72 border-l border-border bg-card flex flex-col">
-      <div className="p-4 border-b border-border">
+    <aside className="w-72 border-l border-border bg-card flex flex-col h-full overflow-hidden">
+      <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold capitalize">{selectedElement.type}</h2>
           <div className="flex items-center gap-1">
@@ -105,54 +163,86 @@ export function PropertiesPanel() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-auto">
         <div className="p-4 space-y-4">
           {/* Position & Size */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Posição e Tamanho (mm)</h3>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">X</Label>
-                <Input
-                  type="number"
-                  value={selectedElement.x}
-                  onChange={(e) => update({ x: parseFloat(e.target.value) || 0 })}
-                  step={0.5}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Y</Label>
-                <Input
-                  type="number"
-                  value={selectedElement.y}
-                  onChange={(e) => update({ y: parseFloat(e.target.value) || 0 })}
-                  step={0.5}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Largura</Label>
-                <Input
-                  type="number"
-                  value={selectedElement.width}
-                  onChange={(e) => update({ width: parseFloat(e.target.value) || 1 })}
-                  step={0.5}
-                  min={1}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Altura</Label>
-                <Input
-                  type="number"
-                  value={selectedElement.height}
-                  onChange={(e) => update({ height: parseFloat(e.target.value) || 1 })}
-                  step={0.5}
-                  min={1}
-                  className="h-8"
-                />
-              </div>
+               <div>
+                 <Label className="text-xs">X</Label>
+                 <Input
+                   type="number"
+                   value={localValues.x ?? selectedElement.x}
+                   onChange={(e) => {
+                     const val = parseFloat(e.target.value) || 0;
+                     updateWithDebounce('x', val, (v) => update({ x: v }), 150);
+                   }}
+                   onBlur={(e) => {
+                     const val = parseFloat(e.target.value) || 0;
+                     if (updateTimeoutRef.current.x) clearTimeout(updateTimeoutRef.current.x);
+                     update({ x: val });
+                   }}
+                   step={0.5}
+                   className="h-8"
+                 />
+               </div>
+               <div>
+                 <Label className="text-xs">Y</Label>
+                 <Input
+                   type="number"
+                   value={localValues.y ?? selectedElement.y}
+                   onChange={(e) => {
+                     const val = parseFloat(e.target.value) || 0;
+                     updateWithDebounce('y', val, (v) => update({ y: v }), 150);
+                   }}
+                   onBlur={(e) => {
+                     const val = parseFloat(e.target.value) || 0;
+                     if (updateTimeoutRef.current.y) clearTimeout(updateTimeoutRef.current.y);
+                     update({ y: val });
+                   }}
+                   step={0.5}
+                   className="h-8"
+                 />
+               </div>
+               <div>
+                 <Label className="text-xs">Largura</Label>
+                 <Input
+                   type="number"
+                   value={localValues.width ?? selectedElement.width}
+                   onChange={(e) => {
+                     const val = parseFloat(e.target.value) || 1;
+                     updateWithDebounce('width', val, (v) => update({ width: v }), 150);
+                   }}
+                   onBlur={(e) => {
+                     const val = parseFloat(e.target.value) || 1;
+                     if (updateTimeoutRef.current.width) clearTimeout(updateTimeoutRef.current.width);
+                     update({ width: val });
+                   }}
+                   step={0.5}
+                   min={1}
+                   className="h-8"
+                 />
+               </div>
+               <div>
+                 <Label className="text-xs">Altura</Label>
+                 <Input
+                   type="number"
+                   value={localValues.height ?? selectedElement.height}
+                   onChange={(e) => {
+                     const val = parseFloat(e.target.value) || 1;
+                     updateWithDebounce('height', val, (v) => update({ height: v }), 150);
+                   }}
+                   onBlur={(e) => {
+                     const val = parseFloat(e.target.value) || 1;
+                     if (updateTimeoutRef.current.height) clearTimeout(updateTimeoutRef.current.height);
+                     update({ height: val });
+                   }}
+                   step={0.5}
+                   min={1}
+                   className="h-8"
+                 />
+               </div>
             </div>
           </div>
 
@@ -229,14 +319,18 @@ export function PropertiesPanel() {
           {selectedElement.type === 'text' && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Texto</h3>
-              <div>
-                <Label className="text-xs">Conteúdo</Label>
-                <Input
-                  value={selectedElement.text || ''}
-                  onChange={(e) => update({ text: e.target.value })}
-                  className="h-8"
-                />
-              </div>
+               <div>
+                 <Label className="text-xs">Conteúdo</Label>
+                 <Input
+                    value={(localValues.text ?? selectedElement.text) || ''}
+                   onChange={(e) => updateWithDebounce('text', e.target.value, (val) => update({ text: val }))}
+                   onBlur={(e) => {
+                     if (updateTimeoutRef.current.text) clearTimeout(updateTimeoutRef.current.text);
+                     update({ text: e.target.value });
+                   }}
+                   className="h-8"
+                 />
+               </div>
               <div>
                 <Label className="text-xs">Fonte</Label>
                 <Select
@@ -312,11 +406,15 @@ export function PropertiesPanel() {
                     onChange={(e) => update({ fill: e.target.value })}
                     className="h-8 w-12 p-1"
                   />
-                  <Input
-                    value={selectedElement.fill || '#000000'}
-                    onChange={(e) => update({ fill: e.target.value })}
-                    className="h-8 flex-1"
-                  />
+                   <Input
+                      value={(localValues.fill ?? selectedElement.fill) || '#000000'}
+                     onChange={(e) => updateWithDebounce('fill', e.target.value, (val) => update({ fill: val }))}
+                     onBlur={(e) => {
+                       if (updateTimeoutRef.current.fill) clearTimeout(updateTimeoutRef.current.fill);
+                       update({ fill: e.target.value });
+                     }}
+                     className="h-8 flex-1"
+                   />
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -332,13 +430,250 @@ export function PropertiesPanel() {
           {selectedElement.type === 'qrcode' && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">QR Code</h3>
+              
+              <Separator />
+              
               <div>
-                <Label className="text-xs">Valor</Label>
-                <Input
-                  value={selectedElement.qrValue || ''}
-                  onChange={(e) => update({ qrValue: e.target.value })}
-                  className="h-8"
-                />
+                <Label className="text-xs font-medium mb-2 block">Fonte de Dados</Label>
+                <Select
+                  value={selectedElement.dataSourceType || 'fixed'}
+                  onValueChange={(value: 'sequential' | 'csv' | 'fixed') => {
+                    if (value === 'sequential') {
+                      update({
+                        dataSourceType: 'sequential',
+                        isDynamic: true,
+                        customSequence: {
+                          start: sequentialConfig.start,
+                          end: sequentialConfig.end,
+                          step: sequentialConfig.step,
+                          padLength: sequentialConfig.padLength,
+                          prefix: sequentialConfig.prefix,
+                          suffix: sequentialConfig.suffix,
+                        },
+                        csvColumn: undefined,
+                      });
+                    } else if (value === 'csv') {
+                      update({
+                        dataSourceType: 'csv',
+                        isDynamic: true,
+                        csvColumn: csvHeaders[0] || '',
+                        customSequence: undefined,
+                      });
+                    } else {
+                      update({
+                        dataSourceType: 'fixed',
+                        isDynamic: false,
+                        csvColumn: undefined,
+                        customSequence: undefined,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sequential">Sequencial</SelectItem>
+                    <SelectItem value="csv">CSV/Excel</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedElement.dataSourceType === 'sequential' && selectedElement.customSequence && (
+                <div className="space-y-2 p-3 bg-muted/50 rounded-md border">
+                  <Label className="text-xs font-medium">Configuração Sequencial</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Início</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.start}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            start: parseInt(e.target.value) || 1
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Fim</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.end}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            end: parseInt(e.target.value) || 100
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Incremento</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.step}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            step: parseInt(e.target.value) || 1
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Zeros à Esquerda</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.padLength}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            padLength: parseInt(e.target.value) || 6
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                     <div>
+                       <Label className="text-xs">Prefixo</Label>
+                       <Input
+                         value={localValues.prefix ?? selectedElement.customSequence.prefix}
+                         onChange={(e) => {
+                           updateWithDebounce('prefix', e.target.value, (val) => {
+                             if (selectedElement.customSequence) {
+                               update({
+                                 customSequence: {
+                                   ...selectedElement.customSequence,
+                                   prefix: val as string
+                                 }
+                               });
+                             }
+                           });
+                         }}
+                         onBlur={(e) => {
+                           if (updateTimeoutRef.current.prefix) clearTimeout(updateTimeoutRef.current.prefix);
+                           if (selectedElement.customSequence) {
+                             update({
+                               customSequence: {
+                                 ...selectedElement.customSequence,
+                                 prefix: e.target.value
+                               }
+                             });
+                           }
+                         }}
+                         className="h-8"
+                         placeholder="Ex: QR-"
+                       />
+                     </div>
+                     <div>
+                       <Label className="text-xs">Sufixo</Label>
+                       <Input
+                         value={localValues.suffix ?? selectedElement.customSequence.suffix}
+                         onChange={(e) => {
+                           updateWithDebounce('suffix', e.target.value, (val) => {
+                             if (selectedElement.customSequence) {
+                               update({
+                                 customSequence: {
+                                   ...selectedElement.customSequence,
+                                   suffix: val as string
+                                 }
+                               });
+                             }
+                           });
+                         }}
+                         onBlur={(e) => {
+                           if (updateTimeoutRef.current.suffix) clearTimeout(updateTimeoutRef.current.suffix);
+                           if (selectedElement.customSequence) {
+                             update({
+                               customSequence: {
+                                 ...selectedElement.customSequence,
+                                 suffix: e.target.value
+                               }
+                             });
+                           }
+                         }}
+                         className="h-8"
+                         placeholder="Opcional"
+                       />
+                     </div>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <Label className="text-xs text-muted-foreground">Exemplo:</Label>
+                    <p className="text-xs font-mono mt-1">
+                      {selectedElement.customSequence.prefix}
+                      {selectedElement.customSequence.start.toString().padStart(selectedElement.customSequence.padLength, '0')}
+                      {selectedElement.customSequence.suffix}
+                      {' → '}
+                      {selectedElement.customSequence.prefix}
+                      {Math.min(selectedElement.customSequence.end, selectedElement.customSequence.start + selectedElement.customSequence.step * 2).toString().padStart(selectedElement.customSequence.padLength, '0')}
+                      {selectedElement.customSequence.suffix}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {selectedElement.dataSourceType === 'csv' && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Coluna do CSV</Label>
+                  {csvHeaders.length > 0 ? (
+                    <Select
+                      value={selectedElement.csvColumn || csvHeaders[0]}
+                      onValueChange={(value) => update({ csvColumn: value })}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {csvHeaders.map((header) => (
+                          <SelectItem key={header} value={header}>
+                            {header}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="p-3 bg-muted/50 rounded-md border border-dashed">
+                      <p className="text-xs text-muted-foreground text-center">
+                        Importe um CSV na guia "Dados" primeiro
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <Separator />
+              
+               <div>
+                 <Label className="text-xs">Valor</Label>
+                 <Input
+                    value={(localValues.qrValue ?? selectedElement.qrValue) || ''}
+                   onChange={(e) => updateWithDebounce('qrValue', e.target.value, (val) => update({ qrValue: val }))}
+                   onBlur={(e) => {
+                     if (updateTimeoutRef.current.qrValue) clearTimeout(updateTimeoutRef.current.qrValue);
+                     update({ qrValue: e.target.value });
+                   }}
+                   className="h-8"
+                   placeholder={
+                     selectedElement.dataSourceType === 'sequential' 
+                       ? 'Use {NUMERO}, {PREFIXO}, {SUFIXO}'
+                       : selectedElement.dataSourceType === 'csv'
+                       ? `Use {${selectedElement.csvColumn || 'COLUNA'}} ou campos dinâmicos`
+                       : 'Digite o valor fixo'
+                   }
+                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selectedElement.dataSourceType === 'sequential' 
+                    ? 'Usará a sequência configurada acima'
+                    : selectedElement.dataSourceType === 'csv'
+                    ? `Valor virá da coluna "${selectedElement.csvColumn || 'selecionada'}" do CSV`
+                    : 'Valor fixo para todas as etiquetas'}
+                </p>
               </div>
               <div>
                 <Label className="text-xs">Nível de Correção</Label>
@@ -366,11 +701,15 @@ export function PropertiesPanel() {
                     onChange={(e) => update({ qrForeground: e.target.value })}
                     className="h-8 w-12 p-1"
                   />
-                  <Input
-                    value={selectedElement.qrForeground || '#000000'}
-                    onChange={(e) => update({ qrForeground: e.target.value })}
-                    className="h-8 flex-1"
-                  />
+                   <Input
+                      value={(localValues.qrForeground ?? selectedElement.qrForeground) || '#000000'}
+                     onChange={(e) => updateWithDebounce('qrForeground', e.target.value, (val) => update({ qrForeground: val }))}
+                     onBlur={(e) => {
+                       if (updateTimeoutRef.current.qrForeground) clearTimeout(updateTimeoutRef.current.qrForeground);
+                       update({ qrForeground: e.target.value });
+                     }}
+                     className="h-8 flex-1"
+                   />
                 </div>
               </div>
               <div>
@@ -382,11 +721,15 @@ export function PropertiesPanel() {
                     onChange={(e) => update({ qrBackground: e.target.value })}
                     className="h-8 w-12 p-1"
                   />
-                  <Input
-                    value={selectedElement.qrBackground || '#ffffff'}
-                    onChange={(e) => update({ qrBackground: e.target.value })}
-                    className="h-8 flex-1"
-                  />
+                   <Input
+                      value={(localValues.qrBackground ?? selectedElement.qrBackground) || '#ffffff'}
+                     onChange={(e) => updateWithDebounce('qrBackground', e.target.value, (val) => update({ qrBackground: val }))}
+                     onBlur={(e) => {
+                       if (updateTimeoutRef.current.qrBackground) clearTimeout(updateTimeoutRef.current.qrBackground);
+                       update({ qrBackground: e.target.value });
+                     }}
+                     className="h-8 flex-1"
+                   />
                 </div>
               </div>
             </div>
@@ -395,6 +738,7 @@ export function PropertiesPanel() {
           {(selectedElement.type === 'barcode' || selectedElement.type === 'datamatrix' || selectedElement.type === 'pdf417') && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Código de Barras</h3>
+              
               {selectedElement.type === 'barcode' && (
                 <div>
                   <Label className="text-xs">Tipo</Label>
@@ -415,13 +759,216 @@ export function PropertiesPanel() {
                   </Select>
                 </div>
               )}
+              
+              <Separator />
+              
               <div>
-                <Label className="text-xs">Valor</Label>
-                <Input
-                  value={selectedElement.barcodeValue || ''}
-                  onChange={(e) => update({ barcodeValue: e.target.value })}
-                  className="h-8"
-                />
+                <Label className="text-xs font-medium mb-2 block">Fonte de Dados</Label>
+                <Select
+                  value={selectedElement.dataSourceType || 'fixed'}
+                  onValueChange={(value: 'sequential' | 'csv' | 'fixed') => {
+                    if (value === 'sequential') {
+                      update({
+                        dataSourceType: 'sequential',
+                        isDynamic: true,
+                        customSequence: {
+                          start: sequentialConfig.start,
+                          end: sequentialConfig.end,
+                          step: sequentialConfig.step,
+                          padLength: sequentialConfig.padLength,
+                          prefix: sequentialConfig.prefix,
+                          suffix: sequentialConfig.suffix,
+                        },
+                        csvColumn: undefined,
+                      });
+                    } else if (value === 'csv') {
+                      update({
+                        dataSourceType: 'csv',
+                        isDynamic: true,
+                        csvColumn: csvHeaders[0] || '',
+                        customSequence: undefined,
+                      });
+                    } else {
+                      update({
+                        dataSourceType: 'fixed',
+                        isDynamic: false,
+                        csvColumn: undefined,
+                        customSequence: undefined,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sequential">Sequencial</SelectItem>
+                    <SelectItem value="csv">CSV/Excel</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedElement.dataSourceType === 'sequential' && selectedElement.customSequence && (
+                <div className="space-y-2 p-3 bg-muted/50 rounded-md border">
+                  <Label className="text-xs font-medium">Configuração Sequencial</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Início</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.start}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            start: parseInt(e.target.value) || 1
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Fim</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.end}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            end: parseInt(e.target.value) || 100
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Incremento</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.step}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            step: parseInt(e.target.value) || 1
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Zeros à Esquerda</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.customSequence.padLength}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            padLength: parseInt(e.target.value) || 6
+                          }
+                        })}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Prefixo</Label>
+                      <Input
+                        value={selectedElement.customSequence.prefix}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            prefix: e.target.value
+                          }
+                        })}
+                        className="h-8"
+                        placeholder="Ex: BAR-"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Sufixo</Label>
+                      <Input
+                        value={selectedElement.customSequence.suffix}
+                        onChange={(e) => update({
+                          customSequence: {
+                            ...selectedElement.customSequence!,
+                            suffix: e.target.value
+                          }
+                        })}
+                        className="h-8"
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <Label className="text-xs text-muted-foreground">Exemplo:</Label>
+                    <p className="text-xs font-mono mt-1">
+                      {selectedElement.customSequence.prefix}
+                      {selectedElement.customSequence.start.toString().padStart(selectedElement.customSequence.padLength, '0')}
+                      {selectedElement.customSequence.suffix}
+                      {' → '}
+                      {selectedElement.customSequence.prefix}
+                      {Math.min(selectedElement.customSequence.end, selectedElement.customSequence.start + selectedElement.customSequence.step * 2).toString().padStart(selectedElement.customSequence.padLength, '0')}
+                      {selectedElement.customSequence.suffix}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {selectedElement.dataSourceType === 'csv' && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Coluna do CSV</Label>
+                  {csvHeaders.length > 0 ? (
+                    <Select
+                      value={selectedElement.csvColumn || csvHeaders[0]}
+                      onValueChange={(value) => update({ csvColumn: value })}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {csvHeaders.map((header) => (
+                          <SelectItem key={header} value={header}>
+                            {header}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="p-3 bg-muted/50 rounded-md border border-dashed">
+                      <p className="text-xs text-muted-foreground text-center">
+                        Importe um CSV na guia "Dados" primeiro
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <Separator />
+              
+               <div>
+                 <Label className="text-xs">Valor</Label>
+                 <Input
+                    value={(localValues.barcodeValue ?? selectedElement.barcodeValue) || ''}
+                   onChange={(e) => updateWithDebounce('barcodeValue', e.target.value, (val) => update({ barcodeValue: val }))}
+                   onBlur={(e) => {
+                     if (updateTimeoutRef.current.barcodeValue) clearTimeout(updateTimeoutRef.current.barcodeValue);
+                     update({ barcodeValue: e.target.value });
+                   }}
+                   className="h-8"
+                   placeholder={
+                     selectedElement.dataSourceType === 'sequential' 
+                       ? 'Use {NUMERO}, {PREFIXO}, {SUFIXO}'
+                       : selectedElement.dataSourceType === 'csv'
+                       ? `Use {${selectedElement.csvColumn || 'COLUNA'}} ou campos dinâmicos`
+                       : 'Digite o valor fixo'
+                   }
+                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selectedElement.dataSourceType === 'sequential' 
+                    ? 'Usará a sequência configurada acima'
+                    : selectedElement.dataSourceType === 'csv'
+                    ? `Valor virá da coluna "${selectedElement.csvColumn || 'selecionada'}" do CSV`
+                    : 'Valor fixo para todas as etiquetas'}
+                </p>
               </div>
               {selectedElement.type === 'barcode' && (
                 <div className="flex items-center justify-between">

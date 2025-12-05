@@ -3,6 +3,7 @@ import { Canvas as FabricCanvas, Rect, Circle, Line, IText, FabricImage, FabricO
 import '@/types/fabric-extensions.d';
 import { useLabelStore } from '@/store/labelStore';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
+import { generateElementSequenceData } from '@/utils/sequenceGenerator';
 
 const MM_TO_PX = 3.78; // Approximate conversion at 96 DPI
 
@@ -250,7 +251,12 @@ export function LabelCanvas() {
         case 'qrcode': {
           let value = element.qrValue || '';
           if (element.isDynamic) {
-            value = replaceDynamicFields(value, sampleData);
+            // Usa sequência personalizada se configurada
+            const elementData = generateElementSequenceData(element, 0, sequentialConfig);
+            value = replaceDynamicFields(value, {
+              ...elementData,
+              custom: {},
+            });
           }
           
           try {
@@ -289,7 +295,12 @@ export function LabelCanvas() {
         case 'pdf417': {
           let value = element.barcodeValue || '';
           if (element.isDynamic) {
-            value = replaceDynamicFields(value, sampleData);
+            // Usa sequência personalizada se configurada
+            const elementData = generateElementSequenceData(element, 0, sequentialConfig);
+            value = replaceDynamicFields(value, {
+              ...elementData,
+              custom: {},
+            });
           }
           
           try {

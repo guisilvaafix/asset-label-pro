@@ -50,6 +50,19 @@ export interface LabelElement {
   qrValue?: string;
   qrForeground?: string;
   qrBackground?: string;
+  // Data source configuration for this element
+  dataSourceType?: 'sequential' | 'csv' | 'fixed';
+  // Sequential configuration (when dataSourceType is 'sequential')
+  customSequence?: {
+    start: number;
+    end: number;
+    step: number;
+    padLength: number;
+    prefix: string;
+    suffix: string;
+  };
+  // CSV column name (when dataSourceType is 'csv')
+  csvColumn?: string;
   // Shape properties
   shapeFill?: string;
   shapeStroke?: string;

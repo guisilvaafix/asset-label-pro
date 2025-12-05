@@ -9,7 +9,8 @@ import {
   ZoomOut,
   LayoutGrid,
   Grid3X3,
-  Magnet
+  Magnet,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,9 +29,10 @@ interface HeaderProps {
   onExport: () => void;
   onSaveTemplate: () => void;
   onLoadTemplate: () => void;
+  onBack?: () => void;
 }
 
-export function Header({ onExport, onSaveTemplate, onLoadTemplate }: HeaderProps) {
+export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: HeaderProps) {
   const { 
     zoom, 
     setZoom, 
@@ -48,10 +50,20 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate }: HeaderProps
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <LayoutGrid className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-bold text-lg">EtiquetaPro</span>
+          <span className="font-bold text-lg">FinalPrint</span>
         </div>
         
         <div className="h-6 w-px bg-border mx-2" />
+        
+        {onBack && (
+          <>
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+            <div className="h-6 w-px bg-border mx-2" />
+          </>
+        )}
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

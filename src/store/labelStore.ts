@@ -58,6 +58,8 @@ interface LabelState {
   // Preview
   previewPage: number;
   setPreviewPage: (page: number) => void;
+  previewZoom: number;
+  setPreviewZoom: (zoom: number) => void;
   totalPages: number;
   
   // Reset
@@ -346,6 +348,8 @@ export const useLabelStore = create<LabelState>()(
       // Preview
       previewPage: 1,
       setPreviewPage: (page) => set({ previewPage: page }),
+      previewZoom: 50,
+      setPreviewZoom: (zoom) => set({ previewZoom: Math.max(10, Math.min(200, zoom)) }),
       get totalPages() {
         const state = get();
         const labelsPerPage = state.sheetConfig.columns * state.sheetConfig.rows;
@@ -366,6 +370,7 @@ export const useLabelStore = create<LabelState>()(
         dataMode: 'sequential',
         zoom: 100,
         previewPage: 1,
+        previewZoom: 50,
       }),
     }),
     {

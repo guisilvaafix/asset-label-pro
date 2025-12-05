@@ -1,8 +1,9 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { SheetConfig, LabelElement, ExportConfig, PAPER_SIZES } from '@/types/label';
+import { SheetConfig, LabelElement, ExportConfig, PAPER_SIZES, SequentialConfig } from '@/types/label';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from './barcodeGenerator';
+import { getElementValue } from './sequenceGenerator';
 
 const MM_TO_PT = 2.83465; // millimeters to points conversion
 
@@ -17,7 +18,8 @@ export async function exportToPDF(
   sheetConfig: SheetConfig,
   elements: LabelElement[],
   labelDataList: LabelData[],
-  exportConfig: ExportConfig
+  exportConfig: ExportConfig,
+  defaultSequence?: SequentialConfig
 ): Promise<void> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -54,8 +56,16 @@ export async function exportToPDF(
       const labelY = pageHeight - (sheetConfig.marginTop + row * (sheetConfig.labelHeight + sheetConfig.spacingVertical) + sheetConfig.labelHeight) * MM_TO_PT;
       
       // Draw each element
+      const globalLabelIndex = pageIndex * labelsPerPage + labelIndex;
       for (const element of elements.sort((a, b) => a.zIndex - b.zIndex)) {
-        await drawElement(page, pdfDoc, element, labelX, labelY, data, font, fontBold, sheetConfig);
+        await drawElement(page, pdfDoc, element, labelX, labelY, data, font, fontBold, sheetConfig, globalLabelIndex, defaultSequence || {
+          start: 1,
+          end: 100,
+          step: 1,
+          padLength: 6,
+          prefix: '',
+          suffix: '',
+        }, data.custom);
       }
     }
   }
@@ -70,7 +80,8 @@ export async function exportToPDFSingle(
   sheetConfig: SheetConfig,
   elements: LabelElement[],
   labelDataList: LabelData[],
-  exportConfig: ExportConfig
+  exportConfig: ExportConfig,
+  defaultSequence?: SequentialConfig
 ): Promise<void> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -79,11 +90,19 @@ export async function exportToPDFSingle(
   const labelWidth = sheetConfig.labelWidth * MM_TO_PT;
   const labelHeight = sheetConfig.labelHeight * MM_TO_PT;
   
-  for (const data of labelDataList) {
+  for (let i = 0; i < labelDataList.length; i++) {
+    const data = labelDataList[i];
     const page = pdfDoc.addPage([labelWidth, labelHeight]);
     
     for (const element of elements.sort((a, b) => a.zIndex - b.zIndex)) {
-      await drawElement(page, pdfDoc, element, 0, 0, data, font, fontBold, sheetConfig);
+      await drawElement(page, pdfDoc, element, 0, 0, data, font, fontBold, sheetConfig, i, defaultSequence || {
+        start: 1,
+        end: 100,
+        step: 1,
+        padLength: 6,
+        prefix: '',
+        suffix: '',
+      }, data.custom);
     }
   }
   
@@ -97,7 +116,8 @@ export async function exportToPNG(
   sheetConfig: SheetConfig,
   elements: LabelElement[],
   labelDataList: LabelData[],
-  exportConfig: ExportConfig
+  exportConfig: ExportConfig,
+  defaultSequence?: SequentialConfig
 ): Promise<void> {
   const zip = new JSZip();
   const dpi = exportConfig.dpi;
@@ -121,7 +141,14 @@ export async function exportToPNG(
     
     // Draw elements
     for (const element of elements.sort((a, b) => a.zIndex - b.zIndex)) {
-      await drawElementCanvas(ctx, element, data, sheetConfig, scale);
+      await drawElementCanvas(ctx, element, data, sheetConfig, scale, i, defaultSequence || {
+        start: 1,
+        end: 100,
+        step: 1,
+        padLength: 6,
+        prefix: '',
+        suffix: '',
+      }, data.custom);
     }
     
     const blob = await new Promise<Blob>((resolve) => {
@@ -146,7 +173,10 @@ async function drawElement(
   data: LabelData,
   font: Awaited<ReturnType<PDFDocument['embedFont']>>,
   fontBold: Awaited<ReturnType<PDFDocument['embedFont']>>,
-  sheetConfig: SheetConfig
+  sheetConfig: SheetConfig,
+  labelIndex: number,
+  defaultSequence: SequentialConfig,
+  csvRow?: Record<string, string>
 ): Promise<void> {
   const x = labelX + element.x * MM_TO_PT;
   const y = labelY + (sheetConfig.labelHeight - element.y - element.height) * MM_TO_PT;
@@ -176,10 +206,7 @@ async function drawElement(
     }
     
     case 'qrcode': {
-      let value = element.qrValue || '';
-      if (element.isDynamic) {
-        value = replaceDynamicFields(value, data);
-      }
+      const value = getElementValue(element, labelIndex, defaultSequence, csvRow);
       
       const qrDataUrl = await generateQRCode(value, {
         width: Math.round(width * 2),
@@ -204,10 +231,7 @@ async function drawElement(
     }
     
     case 'barcode': {
-      let value = element.barcodeValue || '';
-      if (element.isDynamic) {
-        value = replaceDynamicFields(value, data);
-      }
+      const value = getElementValue(element, labelIndex, defaultSequence, csvRow);
       
       const barcodeDataUrl = await generateBarcode(value, element.barcodeType || 'CODE128', {
         width: 2,
@@ -230,10 +254,7 @@ async function drawElement(
     
     case 'datamatrix':
     case 'pdf417': {
-      let value = element.barcodeValue || '';
-      if (element.isDynamic) {
-        value = replaceDynamicFields(value, data);
-      }
+      const value = getElementValue(element, labelIndex, defaultSequence, csvRow);
       
       const barcodeDataUrl = await generateBarcode(
         value,
@@ -335,7 +356,10 @@ async function drawElementCanvas(
   element: LabelElement,
   data: LabelData,
   sheetConfig: SheetConfig,
-  scale: number
+  scale: number,
+  labelIndex: number,
+  defaultSequence: SequentialConfig,
+  csvRow?: Record<string, string>
 ): Promise<void> {
   const pxPerMm = scale * 3.78;
   const x = element.x * pxPerMm;
@@ -368,10 +392,7 @@ async function drawElementCanvas(
     }
     
     case 'qrcode': {
-      let value = element.qrValue || '';
-      if (element.isDynamic) {
-        value = replaceDynamicFields(value, data);
-      }
+      const value = getElementValue(element, labelIndex, defaultSequence, csvRow);
       
       const qrDataUrl = await generateQRCode(value, {
         width: Math.round(width * 2),
@@ -390,10 +411,7 @@ async function drawElementCanvas(
     case 'barcode':
     case 'datamatrix':
     case 'pdf417': {
-      let value = element.barcodeValue || element.qrValue || '';
-      if (element.isDynamic) {
-        value = replaceDynamicFields(value, data);
-      }
+      const value = getElementValue(element, labelIndex, defaultSequence, csvRow);
       
       const barcodeType = element.type === 'datamatrix' ? 'DATAMATRIX' :
                          element.type === 'pdf417' ? 'PDF417' :
