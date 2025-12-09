@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Grid3X3, AlertCircle } from 'lucide-react';
+import { Grid3X3, AlertCircle, Wand2 } from 'lucide-react';
 
 interface ChapaFormModalProps {
   open: boolean;
@@ -265,7 +265,27 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
 
           {/* Layout: Colunas e Linhas */}
           <div>
-            <h4 className="text-sm font-medium mb-3">Layout da Chapa</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium">Layout da Chapa</h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const usableWidth = width - marginLeft - marginRight;
+                  const usableHeight = height - marginTop - marginBottom;
+                  const maxCols = Math.floor((usableWidth + spacingHorizontal) / (labelWidth + spacingHorizontal));
+                  const maxRows = Math.floor((usableHeight + spacingVertical) / (labelHeight + spacingVertical));
+                  setColumns(Math.max(1, maxCols));
+                  setRows(Math.max(1, maxRows));
+                  toast.success(`Layout calculado: ${Math.max(1, maxCols)} colunas × ${Math.max(1, maxRows)} linhas`);
+                }}
+                className="gap-1"
+              >
+                <Wand2 className="h-3 w-3" />
+                Auto
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="columns">Colunas *</Label>
@@ -295,6 +315,52 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                 <Grid3X3 className="h-3 w-3" />
                 {totalLabels} etiquetas por chapa
               </Badge>
+            </div>
+
+            {/* Preview da Chapa */}
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-2">Pré-visualização</p>
+              <div className="flex justify-center">
+                <div 
+                  className="bg-background border border-border relative"
+                  style={{
+                    width: Math.min(200, width * 0.6),
+                    height: Math.min(280, height * 0.6),
+                  }}
+                >
+                  {/* Margens */}
+                  <div 
+                    className="absolute bg-primary/5"
+                    style={{
+                      top: `${(marginTop / height) * 100}%`,
+                      left: `${(marginLeft / width) * 100}%`,
+                      right: `${(marginRight / width) * 100}%`,
+                      bottom: `${(marginBottom / height) * 100}%`,
+                    }}
+                  >
+                    {/* Grid de etiquetas */}
+                    <div 
+                      className="w-full h-full grid"
+                      style={{
+                        gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                        gridTemplateRows: `repeat(${rows}, 1fr)`,
+                        gap: `${Math.max(1, spacingVertical * 0.3)}px ${Math.max(1, spacingHorizontal * 0.3)}px`,
+                        padding: '2px',
+                      }}
+                    >
+                      {Array.from({ length: Math.min(columns * rows, 100) }).map((_, i) => (
+                        <div 
+                          key={i} 
+                          className="bg-primary/20 border border-primary/40 rounded-[1px]"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                {width}×{height}mm • {columns}×{rows} = {totalLabels} etiquetas
+              </p>
             </div>
           </div>
 
