@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOSStore } from '@/store/osStore';
+import { useChapasStore, calcularTotalEtiquetas } from '@/store/chapasStore';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PAPER_SIZES } from '@/types/label';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { AlertCircle, Layers, Grid3X3, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface CreateOSModalProps {
   open: boolean;
@@ -30,70 +34,69 @@ interface CreateOSModalProps {
 export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
   const navigate = useNavigate();
   const { createOS } = useOSStore();
+  const { chapas, getChapa } = useChapasStore();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [paperSize, setPaperSize] = useState('A4');
-  const [labelWidth, setLabelWidth] = useState(50);
-  const [labelHeight, setLabelHeight] = useState(30);
-  const [columns, setColumns] = useState(4);
-  const [rows, setRows] = useState(8);
+  const [selectedChapaId, setSelectedChapaId] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // Get selected chapa details
+  const selectedChapa = useMemo(() => {
+    if (!selectedChapaId) return null;
+    return getChapa(selectedChapaId);
+  }, [selectedChapaId, getChapa]);
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      setName('');
+      setDescription('');
+      setSelectedChapaId('');
+    }
+  }, [open]);
+
   const handleCreate = async () => {
-    if (!name.trim()) {
+    if (!name.trim() || !selectedChapa) {
       return;
     }
 
     setIsCreating(true);
 
-    const paper = PAPER_SIZES[paperSize] || PAPER_SIZES.A4;
-    const margin = 5;
-    const spacing = 2;
-
-    // Calcular dimensões disponíveis
-    const availableWidth = paper.width - (margin * 2);
-    const availableHeight = paper.height - (margin * 2);
-
-    // Calcular dimensões reais considerando espaçamento
-    const totalSpacingWidth = spacing * (columns - 1);
-    const totalSpacingHeight = spacing * (rows - 1);
-    const calculatedWidth = (availableWidth - totalSpacingWidth) / columns;
-    const calculatedHeight = (availableHeight - totalSpacingHeight) / rows;
-
+    // Create OS with snapshot of chapa data
     const os = createOS(name.trim(), description.trim() || undefined, {
-      paperSize,
-      labelWidth: calculatedWidth,
-      labelHeight: calculatedHeight,
-      columns,
-      rows,
+      chapaId: selectedChapa.id,
+      chapaName: selectedChapa.name,
+      // Snapshot das configurações da chapa no momento da criação
+      paperSize: 'CUSTOM',
+      customWidth: selectedChapa.width,
+      customHeight: selectedChapa.height,
+      labelWidth: selectedChapa.labelWidth,
+      labelHeight: selectedChapa.labelHeight,
+      columns: selectedChapa.columns,
+      rows: selectedChapa.rows,
+      marginTop: selectedChapa.marginTop ?? 5,
+      marginBottom: selectedChapa.marginBottom ?? 5,
+      marginLeft: selectedChapa.marginLeft ?? 5,
+      marginRight: selectedChapa.marginRight ?? 5,
+      spacingHorizontal: selectedChapa.spacingHorizontal ?? 2,
+      spacingVertical: selectedChapa.spacingVertical ?? 2,
     });
 
     setIsCreating(false);
     onOpenChange(false);
-    
-    // Reset form
-    setName('');
-    setDescription('');
-    setPaperSize('A4');
-    setLabelWidth(50);
-    setLabelHeight(30);
-    setColumns(4);
-    setRows(8);
 
-    // Navegar para o editor
+    // Navigate to editor
     navigate(`/editor/${os.id}`);
   };
 
   const handleCancel = () => {
     setName('');
     setDescription('');
-    setPaperSize('A4');
-    setLabelWidth(50);
-    setLabelHeight(30);
-    setColumns(4);
-    setRows(8);
+    setSelectedChapaId('');
     onOpenChange(false);
   };
+
+  const canCreate = name.trim() && selectedChapa;
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
@@ -101,7 +104,7 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
         <DialogHeader>
           <DialogTitle>Nova Ordem de Serviço</DialogTitle>
           <DialogDescription>
-            Configure as informações básicas da O.S e as dimensões da etiqueta
+            Selecione uma chapa previamente cadastrada para definir as dimensões das etiquetas
           </DialogDescription>
         </DialogHeader>
 
@@ -127,84 +130,115 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="paperSize">Tamanho do Papel</Label>
-              <Select value={paperSize} onValueChange={setPaperSize}>
-                <SelectTrigger id="paperSize">
-                  <SelectValue />
+          <Separator />
+
+          {/* Seleção de Chapa */}
+          <div className="space-y-2">
+            <Label htmlFor="chapa">Selecione uma Chapa *</Label>
+            {chapas.length === 0 ? (
+              <div className="bg-muted/50 border border-border rounded-md p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Nenhuma chapa cadastrada</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      É necessário cadastrar uma chapa antes de criar uma O.S.
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-3 gap-2">
+                      <Link to="/chapas" onClick={() => onOpenChange(false)}>
+                        <Layers className="h-4 w-4" />
+                        Cadastrar Chapas
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Select value={selectedChapaId} onValueChange={setSelectedChapaId}>
+                <SelectTrigger id="chapa">
+                  <SelectValue placeholder="Selecione uma chapa..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(PAPER_SIZES).map((size) => (
-                    <SelectItem key={size} value={size}>
-                      {size}
+                  {chapas.map((chapa) => (
+                    <SelectItem key={chapa.id} value={chapa.id}>
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-muted-foreground" />
+                        <span>{chapa.name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          ({chapa.labelWidth}×{chapa.labelHeight}mm)
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="labelWidth">Largura da Etiqueta (mm)</Label>
-              <Input
-                id="labelWidth"
-                type="number"
-                min="10"
-                max="300"
-                step="0.1"
-                value={labelWidth}
-                onChange={(e) => setLabelWidth(Number(e.target.value))}
-              />
-            </div>
+          {/* Preview das configurações da chapa selecionada */}
+          {selectedChapa && (
+            <div className="bg-muted/30 border border-border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  Configurações da Chapa (somente leitura)
+                </h4>
+                <Badge variant="secondary" className="gap-1">
+                  <Grid3X3 className="h-3 w-3" />
+                  {calcularTotalEtiquetas(selectedChapa)} etiquetas/chapa
+                </Badge>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="labelHeight">Altura da Etiqueta (mm)</Label>
-              <Input
-                id="labelHeight"
-                type="number"
-                min="10"
-                max="300"
-                step="0.1"
-                value={labelHeight}
-                onChange={(e) => setLabelHeight(Number(e.target.value))}
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Tamanho da Chapa</Label>
+                  <Input
+                    value={`${selectedChapa.width} × ${selectedChapa.height} mm`}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Tamanho da Etiqueta</Label>
+                  <Input
+                    value={`${selectedChapa.labelWidth} × ${selectedChapa.labelHeight} mm`}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="columns">Colunas</Label>
-              <Input
-                id="columns"
-                type="number"
-                min="1"
-                max="20"
-                value={columns}
-                onChange={(e) => setColumns(Number(e.target.value))}
-              />
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Colunas</Label>
+                  <Input
+                    value={selectedChapa.columns}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Linhas</Label>
+                  <Input
+                    value={selectedChapa.rows}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="rows">Linhas</Label>
-              <Input
-                id="rows"
-                type="number"
-                min="1"
-                max="50"
-                value={rows}
-                onChange={(e) => setRows(Number(e.target.value))}
-              />
+              <p className="text-xs text-muted-foreground">
+                Estas configurações são herdadas da chapa e não podem ser editadas na O.S.
+              </p>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={isCreating}>
             Cancelar
           </Button>
-          <Button onClick={handleCreate} disabled={!name.trim() || isCreating}>
+          <Button onClick={handleCreate} disabled={!canCreate || isCreating}>
             {isCreating ? 'Criando...' : 'Criar e Abrir Editor'}
           </Button>
         </DialogFooter>
@@ -212,4 +246,3 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
     </Dialog>
   );
 }
-

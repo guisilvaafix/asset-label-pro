@@ -119,7 +119,7 @@ export function SheetPreview() {
             case 'qrcode': {
               // Draw QR code placeholder with pattern
               // Indicação visual se tem sequência personalizada
-              if (element.useCustomSequence) {
+              if (element.customSequence) {
                 ctx.strokeStyle = '#8b5cf6';
                 ctx.lineWidth = 2.5;
               } else {
@@ -129,7 +129,7 @@ export function SheetPreview() {
               ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
               
               // Draw QR pattern (simplified) in black
-              ctx.fillStyle = element.useCustomSequence ? '#8b5cf6' : '#000000';
+              ctx.fillStyle = element.customSequence ? '#8b5cf6' : '#000000';
               const moduleSize = Math.max(1.5, Math.min(4, elemWidth / 20));
               for (let i = 0; i < 7; i++) {
                 for (let j = 0; j < 7; j++) {
@@ -157,7 +157,7 @@ export function SheetPreview() {
             case 'pdf417': {
               // Draw barcode placeholder with better pattern
               // Indicação visual se tem sequência personalizada
-              if (element.useCustomSequence) {
+              if (element.customSequence) {
                 ctx.strokeStyle = '#8b5cf6';
                 ctx.lineWidth = 2.5;
               } else {
@@ -167,7 +167,7 @@ export function SheetPreview() {
               ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
               
               // Draw more detailed bars pattern
-              ctx.fillStyle = element.useCustomSequence ? '#8b5cf6' : '#000000';
+              ctx.fillStyle = element.customSequence ? '#8b5cf6' : '#000000';
               const barWidth = Math.max(1.5, elemWidth / 20);
               const numBars = Math.floor(elemWidth / (barWidth * 2));
               for (let i = 0; i < numBars; i++) {

@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Calendar, Trash2, Search, Filter, MoreVertical } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Plus, FileText, Calendar, Trash2, Search, Filter, MoreVertical, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useOSStore } from '@/store/osStore';
+import { useChapasStore } from '@/store/chapasStore';
 import { CreateOSModal } from '@/components/os/CreateOSModal';
 import {
   AlertDialog,
@@ -29,6 +30,7 @@ import { cn } from '@/lib/utils';
 export default function Home() {
   const navigate = useNavigate();
   const { osList, deleteOS } = useOSStore();
+  const { chapas } = useChapasStore();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [osToDelete, setOsToDelete] = useState<string | null>(null);
@@ -93,6 +95,15 @@ export default function Home() {
               </div>
               <span className="font-bold text-lg">FinalPrint</span>
             </div>
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/chapas">
+                <Layers className="h-4 w-4" />
+                Gerenciar Chapas
+                {chapas.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{chapas.length}</Badge>
+                )}
+              </Link>
+            </Button>
           </div>
         </div>
       </header>
