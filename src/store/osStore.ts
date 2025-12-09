@@ -33,18 +33,32 @@ export interface OS {
 
 interface OSStore {
   osList: OS[];
-  createOS: (name: string, description?: string, config?: OSConfig) => OS;
-  updateOS: (id: string, updates: Partial<Omit<OS, 'id' | 'createdAt' | 'config'>>) => void;
+  nextSequence: number;
+  createOS: (description?: string, config?: OSConfig) => OS;
+  updateOS: (id: string, updates: Partial<Omit<OS, 'id' | 'createdAt' | 'config' | 'name'>>) => void;
   deleteOS: (id: string) => void;
   getOS: (id: string) => OS | undefined;
+  getNextSequentialName: () => string;
 }
+
+const generateSequentialName = (sequence: number): string => {
+  return `OS_${String(sequence).padStart(7, '0')}`;
+};
 
 export const useOSStore = create<OSStore>()(
   persist(
     (set, get) => ({
       osList: [],
+      nextSequence: 1,
       
-      createOS: (name, description, config) => {
+      getNextSequentialName: () => {
+        return generateSequentialName(get().nextSequence);
+      },
+      
+      createOS: (description, config) => {
+        const currentSequence = get().nextSequence;
+        const name = generateSequentialName(currentSequence);
+        
         const newOS: OS = {
           id: `os-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name,
@@ -56,6 +70,7 @@ export const useOSStore = create<OSStore>()(
         
         set((state) => ({
           osList: [...state.osList, newOS],
+          nextSequence: state.nextSequence + 1,
         }));
         
         return newOS;

@@ -33,12 +33,14 @@ interface CreateOSModalProps {
 
 export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
   const navigate = useNavigate();
-  const { createOS } = useOSStore();
+  const { createOS, getNextSequentialName } = useOSStore();
   const { chapas, getChapa } = useChapasStore();
-  const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedChapaId, setSelectedChapaId] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // Get the next OS name that will be generated
+  const nextOSName = getNextSequentialName();
 
   // Get selected chapa details
   const selectedChapa = useMemo(() => {
@@ -49,21 +51,20 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
-      setName('');
       setDescription('');
       setSelectedChapaId('');
     }
   }, [open]);
 
   const handleCreate = async () => {
-    if (!name.trim() || !selectedChapa) {
+    if (!selectedChapa) {
       return;
     }
 
     setIsCreating(true);
 
-    // Create OS with snapshot of chapa data
-    const os = createOS(name.trim(), description.trim() || undefined, {
+    // Create OS with snapshot of chapa data (name is auto-generated)
+    const os = createOS(description.trim() || undefined, {
       chapaId: selectedChapa.id,
       chapaName: selectedChapa.name,
       // Snapshot das configurações da chapa no momento da criação
@@ -90,13 +91,12 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
   };
 
   const handleCancel = () => {
-    setName('');
     setDescription('');
     setSelectedChapaId('');
     onOpenChange(false);
   };
 
-  const canCreate = name.trim() && selectedChapa;
+  const canCreate = !!selectedChapa;
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
@@ -110,12 +110,11 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nome da O.S *</Label>
+            <Label>Número da O.S (gerado automaticamente)</Label>
             <Input
-              id="name"
-              placeholder="Ex: Etiquetas de Patrimônio"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={nextOSName}
+              disabled
+              className="bg-muted font-mono"
             />
           </div>
 
