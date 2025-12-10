@@ -104,7 +104,7 @@ export function SheetPreview() {
               ctx.setLineDash([2, 2]);
               ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
               ctx.setLineDash([]);
-              
+
               // Draw text label with better quality
               ctx.fillStyle = '#000000';
               const fontSize = Math.max(8, Math.min(12, (element.fontSize || 12) * (MM_TO_PX / 3.78) * 0.7));
@@ -127,14 +127,14 @@ export function SheetPreview() {
                 ctx.lineWidth = 2;
               }
               ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
-              
+
               // Draw QR pattern (simplified) in black
               ctx.fillStyle = element.customSequence ? '#8b5cf6' : '#000000';
               const moduleSize = Math.max(1.5, Math.min(4, elemWidth / 20));
               for (let i = 0; i < 7; i++) {
                 for (let j = 0; j < 7; j++) {
-                  if ((i === 0 || i === 6 || j === 0 || j === 6) || 
-                      ((i === 2 || i === 4) && (j === 2 || j === 4))) {
+                  if ((i === 0 || i === 6 || j === 0 || j === 6) ||
+                    ((i === 2 || i === 4) && (j === 2 || j === 4))) {
                     ctx.fillRect(
                       elemX + i * moduleSize * 3,
                       elemY + j * moduleSize * 3,
@@ -144,7 +144,7 @@ export function SheetPreview() {
                   }
                 }
               }
-              
+
               ctx.font = 'bold 8px Arial';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
@@ -165,7 +165,7 @@ export function SheetPreview() {
                 ctx.lineWidth = 2;
               }
               ctx.strokeRect(elemX, elemY, elemWidth, elemHeight);
-              
+
               // Draw more detailed bars pattern
               ctx.fillStyle = element.customSequence ? '#8b5cf6' : '#000000';
               const barWidth = Math.max(1.5, elemWidth / 20);
@@ -293,7 +293,7 @@ export function SheetPreview() {
           </Button>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-muted/30">
         <ZoomOut className="h-3 w-3 text-muted-foreground" />
         <Slider

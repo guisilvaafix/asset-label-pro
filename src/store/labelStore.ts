@@ -1,20 +1,23 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { 
-  SheetConfig, 
-  LabelElement, 
-  LabelTemplate, 
-  SequentialConfig, 
+import {
+  SheetConfig,
+  LabelElement,
+  LabelTemplate,
+  SequentialConfig,
   DataRow,
   ExportConfig,
-  PAPER_SIZES 
+  PAPER_SIZES
 } from '@/types/label';
 
 interface LabelState {
   // Sheet configuration
   sheetConfig: SheetConfig;
-  setSheetConfig: (config: Partial<SheetConfig>) => void;
-  
+  sheetConfigLocked: boolean;
+  setSheetConfig: (config: Partial<SheetConfig>, force?: boolean) => void;
+  lockSheetConfig: () => void;
+  unlockSheetConfig: () => void;
+
   // Canvas elements
   elements: LabelElement[];
   selectedElementId: string | null;
@@ -24,7 +27,7 @@ interface LabelState {
   setSelectedElement: (id: string | null) => void;
   duplicateElement: (id: string) => void;
   moveElementLayer: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
-  
+
   // Data generation
   dataMode: 'sequential' | 'csv';
   setDataMode: (mode: 'sequential' | 'csv') => void;
@@ -33,18 +36,18 @@ interface LabelState {
   csvData: DataRow[];
   csvHeaders: string[];
   setCsvData: (data: DataRow[], headers: string[]) => void;
-  
+
   // Templates
   templates: LabelTemplate[];
   currentTemplateId: string | null;
   saveTemplate: (name: string) => void;
   loadTemplate: (id: string) => void;
   deleteTemplate: (id: string) => void;
-  
+
   // Export
   exportConfig: ExportConfig;
   setExportConfig: (config: Partial<ExportConfig>) => void;
-  
+
   // Canvas state
   zoom: number;
   setZoom: (zoom: number) => void;
@@ -54,14 +57,22 @@ interface LabelState {
   setSnapToGrid: (snap: boolean) => void;
   gridSize: number;
   setGridSize: (size: number) => void;
-  
+
+  // History (Undo/Redo)
+  history: LabelElement[][];
+  historyIndex: number;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+
   // Preview
   previewPage: number;
   setPreviewPage: (page: number) => void;
   previewZoom: number;
   setPreviewZoom: (zoom: number) => void;
   totalPages: number;
-  
+
   // Reset
   resetToDefault: () => void;
 }
@@ -100,150 +111,109 @@ const defaultExportConfig: ExportConfig = {
   bleedSize: 3,
 };
 
-// Default Brazilian patrimony label template
-const defaultElements: LabelElement[] = [
-  {
-    id: 'title',
-    type: 'text',
-    x: 25,
-    y: 3,
-    width: 40,
-    height: 4,
-    rotation: 0,
-    opacity: 1,
-    zIndex: 5,
-    locked: false,
-    text: 'PATRIMÔNIO',
-    fontFamily: 'Arial',
-    fontSize: 8,
-    fontWeight: 'bold',
-    fill: '#000000',
-    textAlign: 'center',
-  },
-  {
-    id: 'number',
-    type: 'text',
-    x: 25,
-    y: 8,
-    width: 40,
-    height: 6,
-    rotation: 0,
-    opacity: 1,
-    zIndex: 4,
-    locked: false,
-    text: '{PREFIXO}{NUMERO}',
-    fontFamily: 'Arial',
-    fontSize: 12,
-    fontWeight: 'bold',
-    fill: '#000000',
-    textAlign: 'center',
-    isDynamic: true,
-    dynamicField: '{PREFIXO}{NUMERO}',
-  },
-  {
-    id: 'qrcode',
-    type: 'qrcode',
-    x: 3,
-    y: 5,
-    width: 15,
-    height: 15,
-    rotation: 0,
-    opacity: 1,
-    zIndex: 3,
-    locked: false,
-    qrValue: '{PREFIXO}{NUMERO}',
-    qrErrorLevel: 'M',
-    qrForeground: '#000000',
-    qrBackground: '#ffffff',
-    isDynamic: true,
-    dynamicField: '{PREFIXO}{NUMERO}',
-  },
-  {
-    id: 'barcode',
-    type: 'barcode',
-    x: 5,
-    y: 16,
-    width: 40,
-    height: 7,
-    rotation: 0,
-    opacity: 1,
-    zIndex: 2,
-    locked: false,
-    barcodeType: 'CODE128',
-    barcodeValue: '{NUMERO}',
-    displayValue: true,
-    isDynamic: true,
-    dynamicField: '{NUMERO}',
-  },
-  {
-    id: 'warning',
-    type: 'text',
-    x: 25,
-    y: 23,
-    width: 45,
-    height: 2,
-    rotation: 0,
-    opacity: 1,
-    zIndex: 1,
-    locked: false,
-    text: 'Não remover do local',
-    fontFamily: 'Arial',
-    fontSize: 5,
-    fontWeight: 'normal',
-    fontStyle: 'italic',
-    fill: '#666666',
-    textAlign: 'center',
-  },
-];
+// Start with empty canvas - user can add elements as needed
+const defaultElements: LabelElement[] = [];
 
 export const useLabelStore = create<LabelState>()(
   persist(
     (set, get) => ({
       // Sheet configuration
       sheetConfig: defaultSheetConfig,
-      setSheetConfig: (config) => {
+      sheetConfigLocked: false,
+
+      setSheetConfig: (config, force = false) => {
+        const state = get();
+        // Se as configurações estão bloqueadas e não é uma operação forçada, não permite alteração
+        if (state.sheetConfigLocked && !force) {
+          console.warn('Configurações da chapa bloqueadas pela O.S');
+          return;
+        }
         set((state) => {
           const newConfig = { ...state.sheetConfig, ...config };
-          
+
           // Auto-calculate columns and rows if enabled
           if (newConfig.autoCalculate) {
-            const paper = PAPER_SIZES[newConfig.paperSize] || { 
-              width: newConfig.customWidth, 
-              height: newConfig.customHeight 
+            const paper = PAPER_SIZES[newConfig.paperSize] || {
+              width: newConfig.customWidth,
+              height: newConfig.customHeight
             };
             const availableWidth = paper.width - newConfig.marginLeft - newConfig.marginRight;
             const availableHeight = paper.height - newConfig.marginTop - newConfig.marginBottom;
-            
+
             newConfig.columns = Math.floor(
-              (availableWidth + newConfig.spacingHorizontal) / 
+              (availableWidth + newConfig.spacingHorizontal) /
               (newConfig.labelWidth + newConfig.spacingHorizontal)
             );
             newConfig.rows = Math.floor(
-              (availableHeight + newConfig.spacingVertical) / 
+              (availableHeight + newConfig.spacingVertical) /
               (newConfig.labelHeight + newConfig.spacingVertical)
             );
           }
-          
+
           return { sheetConfig: newConfig };
         });
       },
-      
+
+      lockSheetConfig: () => set({ sheetConfigLocked: true }),
+      unlockSheetConfig: () => set({ sheetConfigLocked: false }),
+
       // Canvas elements
       elements: defaultElements,
       selectedElementId: null,
-      addElement: (element) => set((state) => ({ 
-        elements: [...state.elements, element] 
-      })),
-      updateElement: (id, updates) => set((state) => ({
-        elements: state.elements.map((el) => 
+
+      // History
+      history: [defaultElements],
+      historyIndex: 0,
+
+      addElement: (element) => set((state) => {
+        const newElements = [...state.elements, element];
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(newElements))); // Deep copy
+
+        return {
+          elements: newElements,
+          history: newHistory.slice(-50), // Manter apenas últimos 50 estados
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        };
+      }),
+
+      updateElement: (id, updates) => set((state) => {
+        const newElements = state.elements.map((el) =>
           el.id === id ? { ...el, ...updates } : el
-        ),
-      })),
-      removeElement: (id) => set((state) => ({
-        elements: state.elements.filter((el) => el.id !== id),
-        selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
-      })),
+        );
+
+        // Só salvar no histórico se for uma mudança significativa (não micro-movimentos)
+        const shouldSaveHistory = !updates.x && !updates.y; // Não salvar movimentos pequenos
+
+        if (shouldSaveHistory) {
+          const newHistory = state.history.slice(0, state.historyIndex + 1);
+          newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+          return {
+            elements: newElements,
+            history: newHistory.slice(-50),
+            historyIndex: Math.min(newHistory.length - 1, 49),
+          };
+        }
+
+        return { elements: newElements };
+      }),
+
+      removeElement: (id) => set((state) => {
+        const newElements = state.elements.filter((el) => el.id !== id);
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+        return {
+          elements: newElements,
+          selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        };
+      }),
+
       setSelectedElement: (id) => set({ selectedElementId: id }),
+
       duplicateElement: (id) => {
         const state = get();
         const element = state.elements.find((el) => el.id === id);
@@ -254,18 +224,27 @@ export const useLabelStore = create<LabelState>()(
             x: element.x + 2,
             y: element.y + 2,
           };
-          set({ elements: [...state.elements, newElement] });
+          const newElements = [...state.elements, newElement];
+          const newHistory = state.history.slice(0, state.historyIndex + 1);
+          newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+          set({
+            elements: newElements,
+            history: newHistory.slice(-50),
+            historyIndex: Math.min(newHistory.length - 1, 49),
+          });
         }
       },
+
       moveElementLayer: (id, direction) => set((state) => {
         const elements = [...state.elements];
         const index = elements.findIndex((el) => el.id === id);
         if (index === -1) return state;
-        
+
         const element = elements[index];
         const maxZ = Math.max(...elements.map((el) => el.zIndex));
         const minZ = Math.min(...elements.map((el) => el.zIndex));
-        
+
         switch (direction) {
           case 'up':
             element.zIndex = Math.min(element.zIndex + 1, maxZ + 1);
@@ -280,10 +259,51 @@ export const useLabelStore = create<LabelState>()(
             element.zIndex = 0;
             break;
         }
-        
-        return { elements };
+
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(elements)));
+
+        return {
+          elements,
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        };
       }),
-      
+
+      // Undo/Redo
+      undo: () => set((state) => {
+        if (state.historyIndex > 0) {
+          const newIndex = state.historyIndex - 1;
+          return {
+            elements: JSON.parse(JSON.stringify(state.history[newIndex])),
+            historyIndex: newIndex,
+            selectedElementId: null,
+          };
+        }
+        return state;
+      }),
+
+      redo: () => set((state) => {
+        if (state.historyIndex < state.history.length - 1) {
+          const newIndex = state.historyIndex + 1;
+          return {
+            elements: JSON.parse(JSON.stringify(state.history[newIndex])),
+            historyIndex: newIndex,
+            selectedElementId: null,
+          };
+        }
+        return state;
+      }),
+
+      get canUndo() {
+        return get().historyIndex > 0;
+      },
+
+      get canRedo() {
+        return get().historyIndex < get().history.length - 1;
+      },
+
+
       // Data generation
       dataMode: 'sequential',
       setDataMode: (mode) => set({ dataMode: mode }),
@@ -294,7 +314,7 @@ export const useLabelStore = create<LabelState>()(
       csvData: [],
       csvHeaders: [],
       setCsvData: (data, headers) => set({ csvData: data, csvHeaders: headers }),
-      
+
       // Templates
       templates: [],
       currentTemplateId: null,
@@ -328,13 +348,13 @@ export const useLabelStore = create<LabelState>()(
         templates: state.templates.filter((t) => t.id !== id),
         currentTemplateId: state.currentTemplateId === id ? null : state.currentTemplateId,
       })),
-      
+
       // Export
       exportConfig: defaultExportConfig,
       setExportConfig: (config) => set((state) => ({
         exportConfig: { ...state.exportConfig, ...config },
       })),
-      
+
       // Canvas state
       zoom: 100,
       setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),
@@ -344,7 +364,7 @@ export const useLabelStore = create<LabelState>()(
       setSnapToGrid: (snap) => set({ snapToGrid: snap }),
       gridSize: 1,
       setGridSize: (size) => set({ gridSize: size }),
-      
+
       // Preview
       previewPage: 1,
       setPreviewPage: (page) => set({ previewPage: page }),
@@ -358,10 +378,11 @@ export const useLabelStore = create<LabelState>()(
           : state.csvData.length;
         return Math.ceil(totalLabels / labelsPerPage) || 1;
       },
-      
+
       // Reset
       resetToDefault: () => set({
         sheetConfig: defaultSheetConfig,
+        sheetConfigLocked: false,
         elements: defaultElements,
         selectedElementId: null,
         sequentialConfig: defaultSequentialConfig,

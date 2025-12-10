@@ -1,7 +1,7 @@
-import { 
-  Trash2, 
-  Copy, 
-  Lock, 
+import {
+  Trash2,
+  Copy,
+  Lock,
   Unlock,
   ChevronUp,
   ChevronDown,
@@ -38,11 +38,11 @@ const FONT_FAMILIES = [
 ];
 
 export function PropertiesPanel() {
-  const { 
-    elements, 
-    selectedElementId, 
-    updateElement, 
-    removeElement, 
+  const {
+    elements,
+    selectedElementId,
+    updateElement,
+    removeElement,
     duplicateElement,
     moveElementLayer,
     sequentialConfig,
@@ -50,11 +50,11 @@ export function PropertiesPanel() {
   } = useLabelStore();
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
-  
+
   // Estado local para inputs (evita re-renderização e perda de foco)
   const [localValues, setLocalValues] = useState<Record<string, string | number>>({});
   const updateTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
-  
+
   // Sincronizar estado local quando o elemento muda
   useEffect(() => {
     if (selectedElement) {
@@ -76,29 +76,36 @@ export function PropertiesPanel() {
       });
     }
   }, [selectedElement?.id]); // Apenas quando o ID muda, não quando os valores mudam
-  
+
   // Limpar timeouts ao desmontar ou mudar elemento
   useEffect(() => {
     return () => {
       Object.values(updateTimeoutRef.current).forEach(timeout => clearTimeout(timeout));
     };
   }, [selectedElement?.id]);
-  
+
   // Função para atualizar com debounce
   const updateWithDebounce = useCallback((key: string, value: string | number, finalUpdate: (val: any) => void, delay: number = 300) => {
     setLocalValues(prev => ({ ...prev, [key]: value }));
-    
+
     if (updateTimeoutRef.current[key]) {
       clearTimeout(updateTimeoutRef.current[key]);
     }
-    
+
     updateTimeoutRef.current[key] = setTimeout(() => {
       finalUpdate(value);
     }, delay);
   }, []);
-  
+
   // Função para atualizar imediatamente (sem debounce)
   const updateImmediate = useCallback((updates: Partial<typeof selectedElement>) => {
+    if (selectedElement) {
+      updateElement(selectedElement.id, updates);
+    }
+  }, [selectedElement, updateElement]);
+
+  // Função principal de update - DEVE estar antes do return condicional
+  const update = useCallback((updates: Partial<typeof selectedElement>) => {
     if (selectedElement) {
       updateElement(selectedElement.id, updates);
     }
@@ -118,12 +125,6 @@ export function PropertiesPanel() {
       </aside>
     );
   }
-
-  const update = useCallback((updates: Partial<typeof selectedElement>) => {
-    if (selectedElement) {
-      updateElement(selectedElement.id, updates);
-    }
-  }, [selectedElement, updateElement]);
 
   return (
     <aside className="w-72 border-l border-border bg-card flex flex-col h-full overflow-hidden">
@@ -169,80 +170,80 @@ export function PropertiesPanel() {
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Posição e Tamanho (mm)</h3>
             <div className="grid grid-cols-2 gap-2">
-               <div>
-                 <Label className="text-xs">X</Label>
-                 <Input
-                   type="number"
-                   value={localValues.x ?? selectedElement.x}
-                   onChange={(e) => {
-                     const val = parseFloat(e.target.value) || 0;
-                     updateWithDebounce('x', val, (v) => update({ x: v }), 150);
-                   }}
-                   onBlur={(e) => {
-                     const val = parseFloat(e.target.value) || 0;
-                     if (updateTimeoutRef.current.x) clearTimeout(updateTimeoutRef.current.x);
-                     update({ x: val });
-                   }}
-                   step={0.5}
-                   className="h-8"
-                 />
-               </div>
-               <div>
-                 <Label className="text-xs">Y</Label>
-                 <Input
-                   type="number"
-                   value={localValues.y ?? selectedElement.y}
-                   onChange={(e) => {
-                     const val = parseFloat(e.target.value) || 0;
-                     updateWithDebounce('y', val, (v) => update({ y: v }), 150);
-                   }}
-                   onBlur={(e) => {
-                     const val = parseFloat(e.target.value) || 0;
-                     if (updateTimeoutRef.current.y) clearTimeout(updateTimeoutRef.current.y);
-                     update({ y: val });
-                   }}
-                   step={0.5}
-                   className="h-8"
-                 />
-               </div>
-               <div>
-                 <Label className="text-xs">Largura</Label>
-                 <Input
-                   type="number"
-                   value={localValues.width ?? selectedElement.width}
-                   onChange={(e) => {
-                     const val = parseFloat(e.target.value) || 1;
-                     updateWithDebounce('width', val, (v) => update({ width: v }), 150);
-                   }}
-                   onBlur={(e) => {
-                     const val = parseFloat(e.target.value) || 1;
-                     if (updateTimeoutRef.current.width) clearTimeout(updateTimeoutRef.current.width);
-                     update({ width: val });
-                   }}
-                   step={0.5}
-                   min={1}
-                   className="h-8"
-                 />
-               </div>
-               <div>
-                 <Label className="text-xs">Altura</Label>
-                 <Input
-                   type="number"
-                   value={localValues.height ?? selectedElement.height}
-                   onChange={(e) => {
-                     const val = parseFloat(e.target.value) || 1;
-                     updateWithDebounce('height', val, (v) => update({ height: v }), 150);
-                   }}
-                   onBlur={(e) => {
-                     const val = parseFloat(e.target.value) || 1;
-                     if (updateTimeoutRef.current.height) clearTimeout(updateTimeoutRef.current.height);
-                     update({ height: val });
-                   }}
-                   step={0.5}
-                   min={1}
-                   className="h-8"
-                 />
-               </div>
+              <div>
+                <Label className="text-xs">X</Label>
+                <Input
+                  type="number"
+                  value={localValues.x ?? selectedElement.x}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    updateWithDebounce('x', val, (v) => update({ x: v }), 150);
+                  }}
+                  onBlur={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    if (updateTimeoutRef.current.x) clearTimeout(updateTimeoutRef.current.x);
+                    update({ x: val });
+                  }}
+                  step={0.5}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Y</Label>
+                <Input
+                  type="number"
+                  value={localValues.y ?? selectedElement.y}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    updateWithDebounce('y', val, (v) => update({ y: v }), 150);
+                  }}
+                  onBlur={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    if (updateTimeoutRef.current.y) clearTimeout(updateTimeoutRef.current.y);
+                    update({ y: val });
+                  }}
+                  step={0.5}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Largura</Label>
+                <Input
+                  type="number"
+                  value={localValues.width ?? selectedElement.width}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 1;
+                    updateWithDebounce('width', val, (v) => update({ width: v }), 150);
+                  }}
+                  onBlur={(e) => {
+                    const val = parseFloat(e.target.value) || 1;
+                    if (updateTimeoutRef.current.width) clearTimeout(updateTimeoutRef.current.width);
+                    update({ width: val });
+                  }}
+                  step={0.5}
+                  min={1}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Altura</Label>
+                <Input
+                  type="number"
+                  value={localValues.height ?? selectedElement.height}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 1;
+                    updateWithDebounce('height', val, (v) => update({ height: v }), 150);
+                  }}
+                  onBlur={(e) => {
+                    const val = parseFloat(e.target.value) || 1;
+                    if (updateTimeoutRef.current.height) clearTimeout(updateTimeoutRef.current.height);
+                    update({ height: val });
+                  }}
+                  step={0.5}
+                  min={1}
+                  className="h-8"
+                />
+              </div>
             </div>
           </div>
 
@@ -319,18 +320,18 @@ export function PropertiesPanel() {
           {selectedElement.type === 'text' && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Texto</h3>
-               <div>
-                 <Label className="text-xs">Conteúdo</Label>
-                 <Input
-                    value={(localValues.text ?? selectedElement.text) || ''}
-                   onChange={(e) => updateWithDebounce('text', e.target.value, (val) => update({ text: val }))}
-                   onBlur={(e) => {
-                     if (updateTimeoutRef.current.text) clearTimeout(updateTimeoutRef.current.text);
-                     update({ text: e.target.value });
-                   }}
-                   className="h-8"
-                 />
-               </div>
+              <div>
+                <Label className="text-xs">Conteúdo</Label>
+                <Input
+                  value={(localValues.text ?? selectedElement.text) || ''}
+                  onChange={(e) => updateWithDebounce('text', e.target.value, (val) => update({ text: val }))}
+                  onBlur={(e) => {
+                    if (updateTimeoutRef.current.text) clearTimeout(updateTimeoutRef.current.text);
+                    update({ text: e.target.value });
+                  }}
+                  className="h-8"
+                />
+              </div>
               <div>
                 <Label className="text-xs">Fonte</Label>
                 <Select
@@ -406,15 +407,15 @@ export function PropertiesPanel() {
                     onChange={(e) => update({ fill: e.target.value })}
                     className="h-8 w-12 p-1"
                   />
-                   <Input
-                      value={(localValues.fill ?? selectedElement.fill) || '#000000'}
-                     onChange={(e) => updateWithDebounce('fill', e.target.value, (val) => update({ fill: val }))}
-                     onBlur={(e) => {
-                       if (updateTimeoutRef.current.fill) clearTimeout(updateTimeoutRef.current.fill);
-                       update({ fill: e.target.value });
-                     }}
-                     className="h-8 flex-1"
-                   />
+                  <Input
+                    value={(localValues.fill ?? selectedElement.fill) || '#000000'}
+                    onChange={(e) => updateWithDebounce('fill', e.target.value, (val) => update({ fill: val }))}
+                    onBlur={(e) => {
+                      if (updateTimeoutRef.current.fill) clearTimeout(updateTimeoutRef.current.fill);
+                      update({ fill: e.target.value });
+                    }}
+                    className="h-8 flex-1"
+                  />
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -430,9 +431,9 @@ export function PropertiesPanel() {
           {selectedElement.type === 'qrcode' && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">QR Code</h3>
-              
+
               <Separator />
-              
+
               <div>
                 <Label className="text-xs font-medium mb-2 block">Fonte de Dados</Label>
                 <Select
@@ -540,68 +541,68 @@ export function PropertiesPanel() {
                         className="h-8"
                       />
                     </div>
-                     <div>
-                       <Label className="text-xs">Prefixo</Label>
-                       <Input
-                         value={localValues.prefix ?? selectedElement.customSequence.prefix}
-                         onChange={(e) => {
-                           updateWithDebounce('prefix', e.target.value, (val) => {
-                             if (selectedElement.customSequence) {
-                               update({
-                                 customSequence: {
-                                   ...selectedElement.customSequence,
-                                   prefix: val as string
-                                 }
-                               });
-                             }
-                           });
-                         }}
-                         onBlur={(e) => {
-                           if (updateTimeoutRef.current.prefix) clearTimeout(updateTimeoutRef.current.prefix);
-                           if (selectedElement.customSequence) {
-                             update({
-                               customSequence: {
-                                 ...selectedElement.customSequence,
-                                 prefix: e.target.value
-                               }
-                             });
-                           }
-                         }}
-                         className="h-8"
-                         placeholder="Ex: QR-"
-                       />
-                     </div>
-                     <div>
-                       <Label className="text-xs">Sufixo</Label>
-                       <Input
-                         value={localValues.suffix ?? selectedElement.customSequence.suffix}
-                         onChange={(e) => {
-                           updateWithDebounce('suffix', e.target.value, (val) => {
-                             if (selectedElement.customSequence) {
-                               update({
-                                 customSequence: {
-                                   ...selectedElement.customSequence,
-                                   suffix: val as string
-                                 }
-                               });
-                             }
-                           });
-                         }}
-                         onBlur={(e) => {
-                           if (updateTimeoutRef.current.suffix) clearTimeout(updateTimeoutRef.current.suffix);
-                           if (selectedElement.customSequence) {
-                             update({
-                               customSequence: {
-                                 ...selectedElement.customSequence,
-                                 suffix: e.target.value
-                               }
-                             });
-                           }
-                         }}
-                         className="h-8"
-                         placeholder="Opcional"
-                       />
-                     </div>
+                    <div>
+                      <Label className="text-xs">Prefixo</Label>
+                      <Input
+                        value={localValues.prefix ?? selectedElement.customSequence.prefix}
+                        onChange={(e) => {
+                          updateWithDebounce('prefix', e.target.value, (val) => {
+                            if (selectedElement.customSequence) {
+                              update({
+                                customSequence: {
+                                  ...selectedElement.customSequence,
+                                  prefix: val as string
+                                }
+                              });
+                            }
+                          });
+                        }}
+                        onBlur={(e) => {
+                          if (updateTimeoutRef.current.prefix) clearTimeout(updateTimeoutRef.current.prefix);
+                          if (selectedElement.customSequence) {
+                            update({
+                              customSequence: {
+                                ...selectedElement.customSequence,
+                                prefix: e.target.value
+                              }
+                            });
+                          }
+                        }}
+                        className="h-8"
+                        placeholder="Ex: QR-"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Sufixo</Label>
+                      <Input
+                        value={localValues.suffix ?? selectedElement.customSequence.suffix}
+                        onChange={(e) => {
+                          updateWithDebounce('suffix', e.target.value, (val) => {
+                            if (selectedElement.customSequence) {
+                              update({
+                                customSequence: {
+                                  ...selectedElement.customSequence,
+                                  suffix: val as string
+                                }
+                              });
+                            }
+                          });
+                        }}
+                        onBlur={(e) => {
+                          if (updateTimeoutRef.current.suffix) clearTimeout(updateTimeoutRef.current.suffix);
+                          if (selectedElement.customSequence) {
+                            update({
+                              customSequence: {
+                                ...selectedElement.customSequence,
+                                suffix: e.target.value
+                              }
+                            });
+                          }
+                        }}
+                        className="h-8"
+                        placeholder="Opcional"
+                      />
+                    </div>
                   </div>
                   <div className="pt-2 border-t">
                     <Label className="text-xs text-muted-foreground">Exemplo:</Label>
@@ -646,33 +647,33 @@ export function PropertiesPanel() {
                   )}
                 </div>
               )}
-              
+
               <Separator />
-              
-               <div>
-                 <Label className="text-xs">Valor</Label>
-                 <Input
-                    value={(localValues.qrValue ?? selectedElement.qrValue) || ''}
-                   onChange={(e) => updateWithDebounce('qrValue', e.target.value, (val) => update({ qrValue: val }))}
-                   onBlur={(e) => {
-                     if (updateTimeoutRef.current.qrValue) clearTimeout(updateTimeoutRef.current.qrValue);
-                     update({ qrValue: e.target.value });
-                   }}
-                   className="h-8"
-                   placeholder={
-                     selectedElement.dataSourceType === 'sequential' 
-                       ? 'Use {NUMERO}, {PREFIXO}, {SUFIXO}'
-                       : selectedElement.dataSourceType === 'csv'
-                       ? `Use {${selectedElement.csvColumn || 'COLUNA'}} ou campos dinâmicos`
-                       : 'Digite o valor fixo'
-                   }
-                 />
+
+              <div>
+                <Label className="text-xs">Valor</Label>
+                <Input
+                  value={(localValues.qrValue ?? selectedElement.qrValue) || ''}
+                  onChange={(e) => updateWithDebounce('qrValue', e.target.value, (val) => update({ qrValue: val }))}
+                  onBlur={(e) => {
+                    if (updateTimeoutRef.current.qrValue) clearTimeout(updateTimeoutRef.current.qrValue);
+                    update({ qrValue: e.target.value });
+                  }}
+                  className="h-8"
+                  placeholder={
+                    selectedElement.dataSourceType === 'sequential'
+                      ? 'Use {NUMERO}, {PREFIXO}, {SUFIXO}'
+                      : selectedElement.dataSourceType === 'csv'
+                        ? `Use {${selectedElement.csvColumn || 'COLUNA'}} ou campos dinâmicos`
+                        : 'Digite o valor fixo'
+                  }
+                />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {selectedElement.dataSourceType === 'sequential' 
+                  {selectedElement.dataSourceType === 'sequential'
                     ? 'Usará a sequência configurada acima'
                     : selectedElement.dataSourceType === 'csv'
-                    ? `Valor virá da coluna "${selectedElement.csvColumn || 'selecionada'}" do CSV`
-                    : 'Valor fixo para todas as etiquetas'}
+                      ? `Valor virá da coluna "${selectedElement.csvColumn || 'selecionada'}" do CSV`
+                      : 'Valor fixo para todas as etiquetas'}
                 </p>
               </div>
               <div>
@@ -701,15 +702,15 @@ export function PropertiesPanel() {
                     onChange={(e) => update({ qrForeground: e.target.value })}
                     className="h-8 w-12 p-1"
                   />
-                   <Input
-                      value={(localValues.qrForeground ?? selectedElement.qrForeground) || '#000000'}
-                     onChange={(e) => updateWithDebounce('qrForeground', e.target.value, (val) => update({ qrForeground: val }))}
-                     onBlur={(e) => {
-                       if (updateTimeoutRef.current.qrForeground) clearTimeout(updateTimeoutRef.current.qrForeground);
-                       update({ qrForeground: e.target.value });
-                     }}
-                     className="h-8 flex-1"
-                   />
+                  <Input
+                    value={(localValues.qrForeground ?? selectedElement.qrForeground) || '#000000'}
+                    onChange={(e) => updateWithDebounce('qrForeground', e.target.value, (val) => update({ qrForeground: val }))}
+                    onBlur={(e) => {
+                      if (updateTimeoutRef.current.qrForeground) clearTimeout(updateTimeoutRef.current.qrForeground);
+                      update({ qrForeground: e.target.value });
+                    }}
+                    className="h-8 flex-1"
+                  />
                 </div>
               </div>
               <div>
@@ -721,15 +722,15 @@ export function PropertiesPanel() {
                     onChange={(e) => update({ qrBackground: e.target.value })}
                     className="h-8 w-12 p-1"
                   />
-                   <Input
-                      value={(localValues.qrBackground ?? selectedElement.qrBackground) || '#ffffff'}
-                     onChange={(e) => updateWithDebounce('qrBackground', e.target.value, (val) => update({ qrBackground: val }))}
-                     onBlur={(e) => {
-                       if (updateTimeoutRef.current.qrBackground) clearTimeout(updateTimeoutRef.current.qrBackground);
-                       update({ qrBackground: e.target.value });
-                     }}
-                     className="h-8 flex-1"
-                   />
+                  <Input
+                    value={(localValues.qrBackground ?? selectedElement.qrBackground) || '#ffffff'}
+                    onChange={(e) => updateWithDebounce('qrBackground', e.target.value, (val) => update({ qrBackground: val }))}
+                    onBlur={(e) => {
+                      if (updateTimeoutRef.current.qrBackground) clearTimeout(updateTimeoutRef.current.qrBackground);
+                      update({ qrBackground: e.target.value });
+                    }}
+                    className="h-8 flex-1"
+                  />
                 </div>
               </div>
             </div>
@@ -738,7 +739,7 @@ export function PropertiesPanel() {
           {(selectedElement.type === 'barcode' || selectedElement.type === 'datamatrix' || selectedElement.type === 'pdf417') && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Código de Barras</h3>
-              
+
               {selectedElement.type === 'barcode' && (
                 <div>
                   <Label className="text-xs">Tipo</Label>
@@ -759,9 +760,9 @@ export function PropertiesPanel() {
                   </Select>
                 </div>
               )}
-              
+
               <Separator />
-              
+
               <div>
                 <Label className="text-xs font-medium mb-2 block">Fonte de Dados</Label>
                 <Select
@@ -941,33 +942,33 @@ export function PropertiesPanel() {
                   )}
                 </div>
               )}
-              
+
               <Separator />
-              
-               <div>
-                 <Label className="text-xs">Valor</Label>
-                 <Input
-                    value={(localValues.barcodeValue ?? selectedElement.barcodeValue) || ''}
-                   onChange={(e) => updateWithDebounce('barcodeValue', e.target.value, (val) => update({ barcodeValue: val }))}
-                   onBlur={(e) => {
-                     if (updateTimeoutRef.current.barcodeValue) clearTimeout(updateTimeoutRef.current.barcodeValue);
-                     update({ barcodeValue: e.target.value });
-                   }}
-                   className="h-8"
-                   placeholder={
-                     selectedElement.dataSourceType === 'sequential' 
-                       ? 'Use {NUMERO}, {PREFIXO}, {SUFIXO}'
-                       : selectedElement.dataSourceType === 'csv'
-                       ? `Use {${selectedElement.csvColumn || 'COLUNA'}} ou campos dinâmicos`
-                       : 'Digite o valor fixo'
-                   }
-                 />
+
+              <div>
+                <Label className="text-xs">Valor</Label>
+                <Input
+                  value={(localValues.barcodeValue ?? selectedElement.barcodeValue) || ''}
+                  onChange={(e) => updateWithDebounce('barcodeValue', e.target.value, (val) => update({ barcodeValue: val }))}
+                  onBlur={(e) => {
+                    if (updateTimeoutRef.current.barcodeValue) clearTimeout(updateTimeoutRef.current.barcodeValue);
+                    update({ barcodeValue: e.target.value });
+                  }}
+                  className="h-8"
+                  placeholder={
+                    selectedElement.dataSourceType === 'sequential'
+                      ? 'Use {NUMERO}, {PREFIXO}, {SUFIXO}'
+                      : selectedElement.dataSourceType === 'csv'
+                        ? `Use {${selectedElement.csvColumn || 'COLUNA'}} ou campos dinâmicos`
+                        : 'Digite o valor fixo'
+                  }
+                />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {selectedElement.dataSourceType === 'sequential' 
+                  {selectedElement.dataSourceType === 'sequential'
                     ? 'Usará a sequência configurada acima'
                     : selectedElement.dataSourceType === 'csv'
-                    ? `Valor virá da coluna "${selectedElement.csvColumn || 'selecionada'}" do CSV`
-                    : 'Valor fixo para todas as etiquetas'}
+                      ? `Valor virá da coluna "${selectedElement.csvColumn || 'selecionada'}" do CSV`
+                      : 'Valor fixo para todas as etiquetas'}
                 </p>
               </div>
               {selectedElement.type === 'barcode' && (

@@ -6,12 +6,11 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { Header } from '@/components/editor/Header';
 import { ElementsSidebar } from '@/components/editor/ElementsSidebar';
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
-import { SheetConfigPanel } from '@/components/editor/SheetConfigPanel';
 import { DataPanel } from '@/components/editor/DataPanel';
 import { LabelCanvas } from '@/components/editor/LabelCanvas';
 import { SheetPreview } from '@/components/editor/SheetPreview';
 import { ExportDialog } from '@/components/editor/ExportDialog';
-import { Settings, Database, LayoutTemplate } from 'lucide-react';
+import { Database, LayoutTemplate } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useLabelStore } from '@/store/labelStore';
 import { toast } from 'sonner';
@@ -21,9 +20,9 @@ const Editor = () => {
   const { osId } = useParams<{ osId: string }>();
   const navigate = useNavigate();
   const { getOS } = useOSStore();
-  const { setSheetConfig, resetToDefault } = useLabelStore();
+  const { setSheetConfig, lockSheetConfig, resetToDefault } = useLabelStore();
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('config');
+  const [activeTab, setActiveTab] = useState('props');
 
   useEffect(() => {
     if (!osId) {
@@ -41,18 +40,28 @@ const Editor = () => {
     // Carregar configurações da O.S se existirem
     if (os.config) {
       const paper = os.config.paperSize ? PAPER_SIZES[os.config.paperSize] : null;
+      // Usar force=true para permitir a configuração inicial mesmo que esteja bloqueada
       setSheetConfig({
         paperSize: os.config.paperSize || 'A4',
-        customWidth: paper?.width || 210,
-        customHeight: paper?.height || 297,
-        labelWidth: os.config.labelWidth || 50,
-        labelHeight: os.config.labelHeight || 30,
-        columns: os.config.columns || 4,
-        rows: os.config.rows || 8,
+        customWidth: paper?.width ?? 210,
+        customHeight: paper?.height ?? 297,
+        labelWidth: os.config.labelWidth ?? 50,
+        labelHeight: os.config.labelHeight ?? 30,
+        columns: os.config.columns ?? 4,
+        rows: os.config.rows ?? 8,
+        marginTop: os.config.marginTop ?? 10,
+        marginBottom: os.config.marginBottom ?? 10,
+        marginLeft: os.config.marginLeft ?? 10,
+        marginRight: os.config.marginRight ?? 10,
+        spacingHorizontal: os.config.spacingHorizontal ?? 2,
+        spacingVertical: os.config.spacingVertical ?? 2,
         autoCalculate: false, // Desabilitar auto-cálculo para manter as configurações da O.S
-      });
+      }, true);
+
+      // Bloquear as configurações para evitar edições acidentais
+      lockSheetConfig();
     }
-  }, [osId, getOS, navigate, setSheetConfig]);
+  }, [osId, getOS, navigate, setSheetConfig, lockSheetConfig]);
 
   const handleBack = () => {
     navigate('/');
@@ -64,17 +73,17 @@ const Editor = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <Header 
+      <Header
         onExport={() => setExportDialogOpen(true)}
-        onSaveTemplate={() => {}}
-        onLoadTemplate={() => {}}
+        onSaveTemplate={() => { }}
+        onLoadTemplate={() => { }}
         onBack={handleBack}
       />
-      
+
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Elements */}
         <ElementsSidebar />
-        
+
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -88,9 +97,9 @@ const Editor = () => {
                 <LabelCanvas />
               </div>
             </ResizablePanel>
-            
+
             <ResizableHandle withHandle />
-            
+
             {/* Sheet Preview */}
             <ResizablePanel defaultSize={40} minSize={20} maxSize={60}>
               <div className="h-full flex flex-col bg-card">
@@ -103,30 +112,23 @@ const Editor = () => {
         {/* Right Sidebar - Config & Properties */}
         <div className="w-80 border-l border-border flex flex-col bg-card h-full overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="m-2 grid grid-cols-3 flex-shrink-0">
-              <TabsTrigger value="config" className="text-xs gap-1">
-                <Settings className="h-3 w-3" />
-                Chapa
+            <TabsList className="m-2 grid grid-cols-2 flex-shrink-0">
+              <TabsTrigger value="props" className="text-xs gap-1">
+                <LayoutTemplate className="h-3 w-3" />
+                Props
               </TabsTrigger>
               <TabsTrigger value="data" className="text-xs gap-1">
                 <Database className="h-3 w-3" />
                 Dados
               </TabsTrigger>
-              <TabsTrigger value="props" className="text-xs gap-1">
-                <LayoutTemplate className="h-3 w-3" />
-                Props
-              </TabsTrigger>
             </TabsList>
-            
+
             <div className="flex-1 overflow-hidden">
-              <TabsContent value="config" className="m-0 p-3 h-full overflow-auto">
-                <SheetConfigPanel />
+              <TabsContent value="props" className="m-0 p-0 h-full overflow-hidden">
+                <PropertiesPanel />
               </TabsContent>
               <TabsContent value="data" className="m-0 p-3 h-full overflow-auto">
                 <DataPanel />
-              </TabsContent>
-              <TabsContent value="props" className="m-0 p-0 h-full overflow-hidden">
-                <PropertiesPanel />
               </TabsContent>
             </div>
           </Tabs>
