@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOSStore } from '@/store/osStore';
 import { useChapasStore, calcularTotalEtiquetas } from '@/store/chapasStore';
+import { getClientByCode } from '@/services/afixControlApi';
 import {
   Dialog,
   DialogContent,
@@ -23,8 +24,9 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Layers, Grid3X3, Lock } from 'lucide-react';
+import { AlertCircle, Layers, Grid3X3, Lock, Loader2, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface CreateOSModalProps {
   open: boolean;
@@ -38,6 +40,13 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
   const [description, setDescription] = useState('');
   const [selectedChapaId, setSelectedChapaId] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // Estados para busca de cliente
+  const [clientCode, setClientCode] = useState('');
+  const [clientRazaoSocial, setClientRazaoSocial] = useState('');
+  const [clientNomeComercial, setClientNomeComercial] = useState('');
+  const [isLoadingClient, setIsLoadingClient] = useState(false);
+  const [clientError, setClientError] = useState('');
 
   // Get the next OS name that will be generated
   const nextOSName = getNextSequentialName();
@@ -53,8 +62,52 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
     if (open) {
       setDescription('');
       setSelectedChapaId('');
+      setClientCode('');
+      setClientRazaoSocial('');
+      setClientNomeComercial('');
+      setClientError('');
     }
   }, [open]);
+
+  // Buscar cliente quando o código mudar
+  useEffect(() => {
+    const searchClient = async () => {
+      if (!clientCode || clientCode.length < 3) {
+        setClientRazaoSocial('');
+        setClientNomeComercial('');
+        setClientError('');
+        return;
+      }
+
+      setIsLoadingClient(true);
+      setClientError('');
+
+      try {
+        const client = await getClientByCode(clientCode);
+
+        if (client) {
+          setClientRazaoSocial(client.info.razaoSocial);
+          setClientNomeComercial(client.info.nomeComercial);
+          setClientError('');
+        } else {
+          setClientRazaoSocial('');
+          setClientNomeComercial('');
+          setClientError('Cliente não encontrado');
+        }
+      } catch (error) {
+        console.error('Error fetching client:', error);
+        setClientRazaoSocial('');
+        setClientNomeComercial('');
+        setClientError('Erro ao buscar cliente');
+      } finally {
+        setIsLoadingClient(false);
+      }
+    };
+
+    // Debounce de 500ms
+    const timeoutId = setTimeout(searchClient, 500);
+    return () => clearTimeout(timeoutId);
+  }, [clientCode]);
 
   const handleCreate = async () => {
     if (!selectedChapa) {
@@ -64,24 +117,32 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
     setIsCreating(true);
 
     // Create OS with snapshot of chapa data (name is auto-generated)
-    const os = createOS(description.trim() || undefined, {
-      chapaId: selectedChapa.id,
-      chapaName: selectedChapa.name,
-      // Snapshot das configurações da chapa no momento da criação
-      paperSize: 'CUSTOM',
-      customWidth: selectedChapa.width,
-      customHeight: selectedChapa.height,
-      labelWidth: selectedChapa.labelWidth,
-      labelHeight: selectedChapa.labelHeight,
-      columns: selectedChapa.columns,
-      rows: selectedChapa.rows,
-      marginTop: selectedChapa.marginTop ?? 5,
-      marginBottom: selectedChapa.marginBottom ?? 5,
-      marginLeft: selectedChapa.marginLeft ?? 5,
-      marginRight: selectedChapa.marginRight ?? 5,
-      spacingHorizontal: selectedChapa.spacingHorizontal ?? 2,
-      spacingVertical: selectedChapa.spacingVertical ?? 2,
-    });
+    const os = createOS(
+      description.trim() || undefined,
+      {
+        chapaId: selectedChapa.id,
+        chapaName: selectedChapa.name,
+        // Snapshot das configurações da chapa no momento da criação
+        paperSize: 'CUSTOM',
+        customWidth: selectedChapa.width,
+        customHeight: selectedChapa.height,
+        labelWidth: selectedChapa.labelWidth,
+        labelHeight: selectedChapa.labelHeight,
+        columns: selectedChapa.columns,
+        rows: selectedChapa.rows,
+        marginTop: selectedChapa.marginTop ?? 5,
+        marginBottom: selectedChapa.marginBottom ?? 5,
+        marginLeft: selectedChapa.marginLeft ?? 5,
+        marginRight: selectedChapa.marginRight ?? 5,
+        spacingHorizontal: selectedChapa.spacingHorizontal ?? 2,
+        spacingVertical: selectedChapa.spacingVertical ?? 2,
+      },
+      {
+        clientCode: clientCode || undefined,
+        clientRazaoSocial: clientRazaoSocial || undefined,
+        clientNomeComercial: clientNomeComercial || undefined,
+      }
+    );
 
     setIsCreating(false);
     onOpenChange(false);
@@ -127,6 +188,40 @@ export function CreateOSModal({ open, onOpenChange }: CreateOSModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
+          </div>
+
+          <Separator />
+
+          {/* Campos de Cliente */}
+          <div className="space-y-2">
+            <Label htmlFor="clientCode">Código do Cliente (AfixControl)</Label>
+            <div className="relative">
+              <Input
+                id="clientCode"
+                placeholder="Digite o código do cliente..."
+                value={clientCode}
+                onChange={(e) => setClientCode(e.target.value)}
+                className={clientError ? 'border-destructive' : ''}
+              />
+              {isLoadingClient && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {clientError && (
+              <p className="text-xs text-destructive">{clientError}</p>
+            )}
+            {clientRazaoSocial && (
+              <div className="p-3 bg-primary/10 rounded-md border border-primary/20 space-y-1">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">Cliente Encontrado</span>
+                </div>
+                <p className="text-sm font-semibold">{clientRazaoSocial}</p>
+                {clientNomeComercial && clientNomeComercial !== clientRazaoSocial && (
+                  <p className="text-xs text-muted-foreground">{clientNomeComercial}</p>
+                )}
+              </div>
+            )}
           </div>
 
           <Separator />

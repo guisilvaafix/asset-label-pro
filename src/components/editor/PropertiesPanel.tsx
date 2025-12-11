@@ -13,7 +13,7 @@ import {
   Bold,
   Italic
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,13 +49,17 @@ export function PropertiesPanel() {
     csvHeaders
   } = useLabelStore();
 
-  const selectedElement = elements.find((el) => el.id === selectedElementId);
+  // Usar useMemo para estabilizar a referência do selectedElement
+  const selectedElement = useMemo(
+    () => elements.find((el) => el.id === selectedElementId),
+    [elements, selectedElementId]
+  );
 
   // Estado local para inputs (evita re-renderização e perda de foco)
   const [localValues, setLocalValues] = useState<Record<string, string | number>>({});
   const updateTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
-  // Sincronizar estado local quando o elemento muda
+  // Sincronizar estado local quando o elemento muda (apenas quando o ID muda)
   useEffect(() => {
     if (selectedElement) {
       setLocalValues({
@@ -75,14 +79,14 @@ export function PropertiesPanel() {
         suffix: selectedElement.customSequence?.suffix || '',
       });
     }
-  }, [selectedElement?.id]); // Apenas quando o ID muda, não quando os valores mudam
+  }, [selectedElementId]); // Usar selectedElementId ao invés de selectedElement?.id
 
   // Limpar timeouts ao desmontar ou mudar elemento
   useEffect(() => {
     return () => {
       Object.values(updateTimeoutRef.current).forEach(timeout => clearTimeout(timeout));
     };
-  }, [selectedElement?.id]);
+  }, [selectedElementId]);
 
   // Função para atualizar com debounce
   const updateWithDebounce = useCallback((key: string, value: string | number, finalUpdate: (val: any) => void, delay: number = 300) => {

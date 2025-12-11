@@ -74,7 +74,7 @@ export async function exportToPDF(
           padLength: 6,
           prefix: '',
           suffix: '',
-        }, data.custom);
+        }, exportConfig, data.custom);
       }
     }
   }
@@ -111,7 +111,7 @@ export async function exportToPDFSingle(
         padLength: 6,
         prefix: '',
         suffix: '',
-      }, data.custom);
+      }, exportConfig, data.custom);
     }
   }
 
@@ -185,6 +185,7 @@ async function drawElement(
   sheetConfig: SheetConfig,
   labelIndex: number,
   defaultSequence: SequentialConfig,
+  exportConfig: ExportConfig,
   csvRow?: Record<string, string>
 ): Promise<void> {
   const x = labelX + element.x * MM_TO_PT;
@@ -341,13 +342,21 @@ async function drawElement(
 
           // Detectar se é SVG
           if (element.src.includes('.svg') || element.src.includes('svg+xml')) {
-            // Converter SVG para PNG
+            // Converter SVG para PNG em ALTA RESOLUÇÃO para manter qualidade próxima ao vetor
             const img = await loadImage(element.src);
             const canvas = document.createElement('canvas');
-            canvas.width = Math.round(width * 2); // 2x para melhor qualidade
-            canvas.height = Math.round(height * 2);
+
+            // Usar DPI de exportação para calcular resolução (mínimo 4x para SVG)
+            const scaleFactor = Math.max(4, exportConfig.dpi / 96);
+            canvas.width = Math.round(width * scaleFactor);
+            canvas.height = Math.round(height * scaleFactor);
+
             const ctx = canvas.getContext('2d');
             if (ctx) {
+              // Habilitar suavização para melhor qualidade
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
               const pngDataUrl = canvas.toDataURL('image/png');
               imageBytes = await fetch(pngDataUrl).then((res) => res.arrayBuffer());

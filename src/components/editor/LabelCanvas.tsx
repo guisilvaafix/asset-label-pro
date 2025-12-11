@@ -322,9 +322,21 @@ export function LabelCanvas() {
 
     // Keyboard controls (Arrow keys to move, Delete to remove, Ctrl+Z/Y for undo/redo)
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Verificar se o foco está em um elemento editável (input, textarea, select, etc.)
+      const activeElement = document.activeElement;
+      const isEditableElement = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'SELECT' ||
+        activeElement.getAttribute('contenteditable') === 'true'
+      );
+
+      // Não fazer nada se estiver digitando em um campo de formulário
+      if (isEditableElement) return;
+
       const activeObject = canvas.getActiveObject() as ExtendedFabricObject | undefined;
 
-      // Não fazer nada se estiver editando texto
+      // Não fazer nada se estiver editando texto no canvas
       const isEditingText = activeObject && 'isEditing' in activeObject && (activeObject as any).isEditing;
       if (isEditingText) return;
 
@@ -673,9 +685,66 @@ export function LabelCanvas() {
     canvas.renderAll();
   }, [elements, showGrid, gridSize, labelWidthPx, labelHeightPx, isInitialized, sequentialConfig]);
 
+  // Usar uma versão memoizada dos elementos para evitar re-renders desnecessários
+  const elementsRef = useRef<typeof elements>([]);
+
   useEffect(() => {
-    renderElements();
-  }, [renderElements]);
+    const previous = elementsRef.current;
+
+    // Verificar se é uma mudança estrutural (adicionar/remover elementos)
+    const isStructuralChange =
+      elements.length !== previous.length ||
+      elements.some((el, idx) => el.id !== previous[idx]?.id);
+
+    // Se for mudança estrutural, sempre re-renderizar
+    if (isStructuralChange) {
+      elementsRef.current = elements;
+      renderElements();
+      return;
+    }
+
+    // Se não for estrutural, verificar se alguma propriedade visual mudou
+    const hasVisualChange = elements.some((el, idx) => {
+      const prev = previous[idx];
+      if (!prev) return true;
+
+      // Propriedades que afetam a renderização visual
+      // NOTA: text, qrValue e barcodeValue NÃO estão aqui para evitar re-renders durante digitação
+      return (
+        el.x !== prev.x ||
+        el.y !== prev.y ||
+        el.width !== prev.width ||
+        el.height !== prev.height ||
+        el.rotation !== prev.rotation ||
+        el.opacity !== prev.opacity ||
+        el.locked !== prev.locked ||
+        el.fill !== prev.fill ||
+        el.src !== prev.src ||
+        el.shapeFill !== prev.shapeFill ||
+        el.shapeStroke !== prev.shapeStroke ||
+        el.shapeStrokeWidth !== prev.shapeStrokeWidth ||
+        el.fontFamily !== prev.fontFamily ||
+        el.fontSize !== prev.fontSize ||
+        el.fontWeight !== prev.fontWeight ||
+        el.fontStyle !== prev.fontStyle ||
+        el.textAlign !== prev.textAlign ||
+        el.displayValue !== prev.displayValue ||
+        el.barcodeType !== prev.barcodeType ||
+        el.qrErrorLevel !== prev.qrErrorLevel ||
+        el.qrForeground !== prev.qrForeground ||
+        el.qrBackground !== prev.qrBackground ||
+        el.cornerRadius !== prev.cornerRadius ||
+        el.dataSourceType !== prev.dataSourceType ||
+        el.csvColumn !== prev.csvColumn ||
+        JSON.stringify(el.customSequence) !== JSON.stringify(prev.customSequence)
+      );
+    });
+
+    if (hasVisualChange) {
+      elementsRef.current = elements;
+      renderElements();
+    }
+  }, [elements, renderElements]);
 
   // Handle selection from store
   useEffect(() => {

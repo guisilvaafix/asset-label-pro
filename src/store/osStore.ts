@@ -29,12 +29,16 @@ export interface OS {
   updatedAt: string;
   // Configurações iniciais da O.S (snapshot da chapa)
   config?: OSConfig;
+  // Informações do cliente (AfixControl)
+  clientCode?: string;
+  clientRazaoSocial?: string;
+  clientNomeComercial?: string;
 }
 
 interface OSStore {
   osList: OS[];
   nextSequence: number;
-  createOS: (description?: string, config?: OSConfig) => OS;
+  createOS: (description?: string, config?: OSConfig, clientData?: { clientCode?: string; clientRazaoSocial?: string; clientNomeComercial?: string }) => OS;
   updateOS: (id: string, updates: Partial<Omit<OS, 'id' | 'createdAt' | 'config' | 'name'>>) => void;
   deleteOS: (id: string) => void;
   getOS: (id: string) => OS | undefined;
@@ -50,15 +54,15 @@ export const useOSStore = create<OSStore>()(
     (set, get) => ({
       osList: [],
       nextSequence: 1,
-      
+
       getNextSequentialName: () => {
         return generateSequentialName(get().nextSequence);
       },
-      
-      createOS: (description, config) => {
+
+      createOS: (description, config, clientData) => {
         const currentSequence = get().nextSequence;
         const name = generateSequentialName(currentSequence);
-        
+
         const newOS: OS = {
           id: `os-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name,
@@ -66,16 +70,19 @@ export const useOSStore = create<OSStore>()(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           config,
+          clientCode: clientData?.clientCode,
+          clientRazaoSocial: clientData?.clientRazaoSocial,
+          clientNomeComercial: clientData?.clientNomeComercial,
         };
-        
+
         set((state) => ({
           osList: [...state.osList, newOS],
           nextSequence: state.nextSequence + 1,
         }));
-        
+
         return newOS;
       },
-      
+
       // Nota: config não pode ser alterado após criação (snapshot imutável)
       updateOS: (id, updates) => {
         set((state) => ({
@@ -86,13 +93,13 @@ export const useOSStore = create<OSStore>()(
           ),
         }));
       },
-      
+
       deleteOS: (id) => {
         set((state) => ({
           osList: state.osList.filter((os) => os.id !== id),
         }));
       },
-      
+
       getOS: (id) => {
         return get().osList.find((os) => os.id === id);
       },

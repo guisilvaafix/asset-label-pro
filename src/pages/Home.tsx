@@ -209,6 +209,17 @@ export default function Home() {
                         <CardTitle className="text-lg mb-1 line-clamp-1 group-hover:text-primary transition-colors">
                           {os.name}
                         </CardTitle>
+                        {os.clientCode && os.clientRazaoSocial && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 mb-2">
+                            <span className="font-mono font-semibold text-primary">
+                              {os.clientCode}
+                            </span>
+                            <span className="text-xs">•</span>
+                            <span className="line-clamp-1">
+                              {os.clientRazaoSocial}
+                            </span>
+                          </div>
+                        )}
                         {os.description && (
                           <CardDescription className="line-clamp-2 mt-1">
                             {os.description}

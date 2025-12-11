@@ -1,10 +1,10 @@
-import { 
-  Type, 
-  Image, 
-  QrCode, 
-  Barcode, 
-  Square, 
-  Circle, 
+import {
+  Type,
+  Image,
+  QrCode,
+  Barcode,
+  Square,
+  Circle,
   Minus,
   Grid2X2,
   FileText,
@@ -67,7 +67,7 @@ export function ElementsSidebar() {
   const handleAddImage = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/jpg';
+    input.accept = 'image/png,image/jpeg,image/jpg,image/svg+xml';
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
@@ -159,7 +159,7 @@ export function ElementsSidebar() {
         <h2 className="font-semibold text-sm">Elementos</h2>
         <p className="text-xs text-muted-foreground">Arraste para o canvas</p>
       </div>
-      
+
       <ScrollArea className="flex-1">
         <div className="p-3">
           <Accordion type="multiple" defaultValue={['basic', 'dynamic', 'codes', 'shapes']} className="space-y-2">
@@ -269,9 +269,9 @@ export function ElementsSidebar() {
                       <span className="text-xs">PDF417</span>
                     </Button>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <p className="text-xs text-muted-foreground font-medium">Códigos de Barras 1D</p>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {BARCODE_TYPES.map((type) => (
