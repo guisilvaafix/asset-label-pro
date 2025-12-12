@@ -1,16 +1,17 @@
-import { 
-  Save, 
-  FolderOpen, 
-  FileDown, 
-  Settings, 
-  Undo, 
-  Redo, 
-  ZoomIn, 
+import {
+  Save,
+  FolderOpen,
+  FileDown,
+  Settings,
+  Undo,
+  Redo,
+  ZoomIn,
   ZoomOut,
   LayoutGrid,
   Grid3X3,
   Magnet,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,18 +30,21 @@ interface HeaderProps {
   onExport: () => void;
   onSaveTemplate: () => void;
   onLoadTemplate: () => void;
+  onGenerateLayout: () => void;
   onBack?: () => void;
+  isSaving?: boolean;
+  lastSaved?: Date | null;
 }
 
-export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: HeaderProps) {
-  const { 
-    zoom, 
-    setZoom, 
-    showGrid, 
-    setShowGrid, 
-    snapToGrid, 
+export function Header({ onExport, onSaveTemplate, onLoadTemplate, onGenerateLayout, onBack, isSaving, lastSaved }: HeaderProps) {
+  const {
+    zoom,
+    setZoom,
+    showGrid,
+    setShowGrid,
+    snapToGrid,
     setSnapToGrid,
-    resetToDefault 
+    resetToDefault
   } = useLabelStore();
 
   return (
@@ -52,9 +56,9 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: Hea
           </div>
           <span className="font-bold text-lg">FinalPrint</span>
         </div>
-        
+
         <div className="h-6 w-px bg-border mx-2" />
-        
+
         {onBack && (
           <>
             <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
@@ -64,7 +68,24 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: Hea
             <div className="h-6 w-px bg-border mx-2" />
           </>
         )}
-        
+
+        {/* Auto-save indicator */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {isSaving ? (
+            <>
+              <Save className="h-3 w-3 animate-pulse" />
+              <span>Salvando...</span>
+            </>
+          ) : lastSaved ? (
+            <>
+              <Save className="h-3 w-3 text-green-600" />
+              <span className="text-green-600">Salvo automaticamente</span>
+            </>
+          ) : null}
+        </div>
+
+        <div className="h-6 w-px bg-border mx-2" />
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -99,16 +120,16 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: Hea
 
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <Toggle 
-            pressed={showGrid} 
+          <Toggle
+            pressed={showGrid}
             onPressedChange={setShowGrid}
             size="sm"
             aria-label="Mostrar grid"
           >
             <Grid3X3 className="h-4 w-4" />
           </Toggle>
-          <Toggle 
-            pressed={snapToGrid} 
+          <Toggle
+            pressed={snapToGrid}
             onPressedChange={setSnapToGrid}
             size="sm"
             aria-label="Snap to grid"
@@ -120,9 +141,9 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: Hea
         <div className="h-6 w-px bg-border" />
 
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setZoom(zoom - 10)}
             disabled={zoom <= 10}
           >
@@ -137,9 +158,9 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: Hea
               step={10}
             />
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setZoom(zoom + 10)}
             disabled={zoom >= 500}
           >
@@ -149,6 +170,11 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onBack }: Hea
         </div>
 
         <div className="h-6 w-px bg-border" />
+
+        <Button onClick={onGenerateLayout} variant="outline" className="gap-2">
+          <FileText className="h-4 w-4" />
+          Gerar Layout
+        </Button>
 
         <Button onClick={onExport} className="gap-2">
           <FileDown className="h-4 w-4" />

@@ -33,6 +33,8 @@ export interface OS {
   clientCode?: string;
   clientRazaoSocial?: string;
   clientNomeComercial?: string;
+  // Elementos da etiqueta salvos para esta O.S
+  elements?: any[];
 }
 
 interface OSStore {
@@ -43,6 +45,7 @@ interface OSStore {
   deleteOS: (id: string) => void;
   getOS: (id: string) => OS | undefined;
   getNextSequentialName: () => string;
+  saveOSElements: (id: string, elements: any[]) => void;
 }
 
 const generateSequentialName = (sequence: number): string => {
@@ -102,6 +105,16 @@ export const useOSStore = create<OSStore>()(
 
       getOS: (id) => {
         return get().osList.find((os) => os.id === id);
+      },
+
+      saveOSElements: (id, elements) => {
+        set((state) => ({
+          osList: state.osList.map((os) =>
+            os.id === id
+              ? { ...os, elements, updatedAt: new Date().toISOString() }
+              : os
+          ),
+        }));
       },
     }),
     {

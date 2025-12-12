@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,7 +10,8 @@ import { DataPanel } from '@/components/editor/DataPanel';
 import { LabelCanvas } from '@/components/editor/LabelCanvas';
 import { SheetPreview } from '@/components/editor/SheetPreview';
 import { ExportDialog } from '@/components/editor/ExportDialog';
-import { Database, LayoutTemplate } from 'lucide-react';
+import { GenerateLayoutModal } from '@/components/editor/GenerateLayoutModal';
+import { Database, LayoutTemplate, Save, Check } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useLabelStore } from '@/store/labelStore';
 import { toast } from 'sonner';
@@ -19,10 +20,15 @@ import { PAPER_SIZES } from '@/types/label';
 const Editor = () => {
   const { osId } = useParams<{ osId: string }>();
   const navigate = useNavigate();
-  const { getOS } = useOSStore();
-  const { setSheetConfig, lockSheetConfig, resetToDefault } = useLabelStore();
+  const { getOS, updateOS, saveOSElements } = useOSStore();
+  const { elements, setSheetConfig, lockSheetConfig, resetToDefault, loadElements } = useLabelStore();
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [generateLayoutOpen, setGenerateLayoutOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('props');
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     if (!osId) {
@@ -36,6 +42,9 @@ const Editor = () => {
       navigate('/');
       return;
     }
+
+    // Resetar para limpar elementos de outras O.S
+    resetToDefault();
 
     // Carregar configurações da O.S se existirem
     if (os.config) {
@@ -61,7 +70,45 @@ const Editor = () => {
       // Bloquear as configurações para evitar edições acidentais
       lockSheetConfig();
     }
-  }, [osId, getOS, navigate, setSheetConfig, lockSheetConfig]);
+
+    // Carregar elementos salvos desta O.S com um pequeno delay
+    // para garantir que o reset completou
+    setTimeout(() => {
+      if (os.elements && os.elements.length > 0) {
+        // Restaurar elementos da O.S usando loadElements
+        loadElements(os.elements);
+      }
+      setIsInitialized(true);
+    }, 100);
+  }, [osId, getOS, navigate, setSheetConfig, lockSheetConfig, resetToDefault, loadElements]);
+
+  // Auto-save: Salvar elementos automaticamente quando houver mudanças
+  useEffect(() => {
+    if (!osId || !isInitialized) return;
+
+    // Limpar timeout anterior
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Criar novo timeout para salvar após 1 segundo de inatividade
+    saveTimeoutRef.current = setTimeout(() => {
+      setIsSaving(true);
+
+      // Salvar elementos específicos desta O.S
+      saveOSElements(osId, elements);
+
+      setLastSaved(new Date());
+      setIsSaving(false);
+    }, 1000);
+
+    // Cleanup
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [elements, osId, saveOSElements, isInitialized]);
 
   const handleBack = () => {
     navigate('/');
@@ -77,7 +124,10 @@ const Editor = () => {
         onExport={() => setExportDialogOpen(true)}
         onSaveTemplate={() => { }}
         onLoadTemplate={() => { }}
+        onGenerateLayout={() => setGenerateLayoutOpen(true)}
         onBack={handleBack}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -136,6 +186,13 @@ const Editor = () => {
       </div>
 
       <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} />
+      {osId && (
+        <GenerateLayoutModal
+          open={generateLayoutOpen}
+          onOpenChange={setGenerateLayoutOpen}
+          osId={osId}
+        />
+      )}
     </div>
   );
 };

@@ -75,6 +75,7 @@ interface LabelState {
 
   // Reset
   resetToDefault: () => void;
+  loadElements: (elements: LabelElement[]) => void;
 }
 
 const defaultSheetConfig: SheetConfig = {
@@ -392,6 +393,14 @@ export const useLabelStore = create<LabelState>()(
         zoom: 100,
         previewPage: 1,
         previewZoom: 50,
+      }),
+
+      // Load elements (para restaurar elementos salvos de uma O.S)
+      loadElements: (elements) => set({
+        elements: JSON.parse(JSON.stringify(elements)), // Deep copy
+        history: [JSON.parse(JSON.stringify(elements))],
+        historyIndex: 0,
+        selectedElementId: null,
       }),
     }),
     {

@@ -35,6 +35,7 @@ export default function Home() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [osToDelete, setOsToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [clientCodeFilter, setClientCodeFilter] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'date'>('date');
 
   const filteredAndSortedOS = useMemo(() => {
@@ -50,6 +51,14 @@ export default function Home() {
       );
     }
 
+    // Filtrar por código do cliente
+    if (clientCodeFilter.trim()) {
+      const codeQuery = clientCodeFilter.toLowerCase();
+      filtered = filtered.filter(
+        (os) => os.clientCode?.toLowerCase().includes(codeQuery)
+      );
+    }
+
     // Ordenar
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === 'name') {
@@ -60,7 +69,7 @@ export default function Home() {
     });
 
     return sorted;
-  }, [osList, searchQuery, sortBy]);
+  }, [osList, searchQuery, clientCodeFilter, sortBy]);
 
   const handleCreateOS = () => {
     setCreateModalOpen(true);
@@ -123,38 +132,87 @@ export default function Home() {
         </div>
 
         {osList.length > 0 && (
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar O.S por nome ou descrição..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar O.S por nome ou descrição..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="relative sm:w-64">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrar por código do cliente..."
+                  value={clientCodeFilter}
+                  onChange={(e) => setClientCodeFilter(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Ordenar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setSortBy('date')}
+                    className={cn(sortBy === 'date' && 'bg-accent')}
+                  >
+                    Mais recente
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSortBy('name')}
+                    className={cn(sortBy === 'name' && 'bg-accent')}
+                  >
+                    Nome (A-Z)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Filter className="h-4 w-4" />
-                  Ordenar
+            {(searchQuery || clientCodeFilter) && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Filtros ativos:</span>
+                {searchQuery && (
+                  <Badge variant="secondary" className="gap-1">
+                    Busca: {searchQuery}
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                {clientCodeFilter && (
+                  <Badge variant="secondary" className="gap-1">
+                    Código: {clientCodeFilter}
+                    <button
+                      onClick={() => setClientCodeFilter('')}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setClientCodeFilter('');
+                  }}
+                  className="h-6 text-xs"
+                >
+                  Limpar todos
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setSortBy('date')}
-                  className={cn(sortBy === 'date' && 'bg-accent')}
-                >
-                  Mais recente
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy('name')}
-                  className={cn(sortBy === 'name' && 'bg-accent')}
-                >
-                  Nome (A-Z)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </div>
+            )}
           </div>
         )}
 
@@ -184,10 +242,13 @@ export default function Home() {
               </p>
               <Button
                 variant="outline"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setClientCodeFilter('');
+                }}
                 className="gap-2"
               >
-                Limpar busca
+                Limpar filtros
               </Button>
             </CardContent>
           </Card>
