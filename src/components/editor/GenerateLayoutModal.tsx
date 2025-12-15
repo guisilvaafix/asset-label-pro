@@ -135,36 +135,39 @@ export function GenerateLayoutModal({ open, onOpenChange, osId }: GenerateLayout
             pdf.text('Layout de Aprovação', margin + 3, yPosition + 5.5);
             yPosition += 12;
 
-            // Captura da etiqueta limpa (sem grid, sem bordas)
+            // Capturar a imagem da etiqueta do canvas do editor SEM o grid
             let labelImageData = null;
             try {
+                // Procurar pelo canvas do LabelCanvas (menor canvas, que é o editor)
                 const canvasElements = document.querySelectorAll('canvas');
                 let labelCanvas: HTMLCanvasElement | null = null;
                 let minArea = Infinity;
 
+                // Encontrar o canvas menor (que é o LabelCanvas, não o SheetPreview)
                 canvasElements.forEach(canvas => {
                     const area = canvas.width * canvas.height;
-                    if (area > 1000 && area < minArea) {
+                    // O LabelCanvas geralmente tem área entre 1000 e 100000 pixels
+                    if (area > 1000 && area < 100000 && area < minArea) {
                         minArea = area;
                         labelCanvas = canvas;
                     }
                 });
 
                 if (labelCanvas) {
-                    // Criar um canvas temporário para renderizar apenas os elementos
+                    // Criar canvas temporário para renderizar sem o grid
                     const tempCanvas = document.createElement('canvas');
                     tempCanvas.width = labelCanvas.width;
                     tempCanvas.height = labelCanvas.height;
                     const ctx = tempCanvas.getContext('2d');
 
                     if (ctx) {
-                        // Fundo condicional: cinza claro para alumínio, branco para outros
+                        // Fundo branco (ou cinza para alumínio)
                         const isAluminum = formData.material.toLowerCase().includes('alumínio') ||
                             formData.material.toLowerCase().includes('aluminio');
                         ctx.fillStyle = isAluminum ? '#f5f5f5' : '#ffffff';
                         ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-                        // Copiar apenas o conteúdo do canvas original
+                        // Copiar apenas o conteúdo do canvas original (sem o grid)
                         ctx.drawImage(labelCanvas, 0, 0);
 
                         labelImageData = tempCanvas.toDataURL('image/png');
@@ -212,7 +215,7 @@ export function GenerateLayoutModal({ open, onOpenChange, osId }: GenerateLayout
                     const xOffset = margin + (95 - previewWidth) / 2;
                     const yOffset = yPosition + (previewBoxHeight - previewHeight) / 2;
 
-                    // Adicionar a imagem com cantos arredondados (simulado com clip)
+                    // Adicionar a imagem
                     pdf.addImage(labelImageData, 'PNG', xOffset, yOffset, previewWidth, previewHeight);
                 } catch (error) {
                     console.warn('Erro ao adicionar imagem:', error);
