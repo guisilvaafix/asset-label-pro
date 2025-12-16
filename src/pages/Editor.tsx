@@ -15,6 +15,8 @@ import { Database, LayoutTemplate, Save, Check } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useLabelStore } from '@/store/labelStore';
 import { toast } from 'sonner';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { KeyboardShortcutsHelp } from '@/components/editor/KeyboardShortcutsHelp';
 import { PAPER_SIZES } from '@/types/label';
 
 const Editor = () => {
@@ -109,6 +111,17 @@ const Editor = () => {
       }
     };
   }, [elements, osId, saveOSElements, isInitialized]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSave: () => {
+      if (osId) {
+        saveOSElements(osId, elements);
+        toast.success('Salvo manualmente');
+      }
+    },
+    onExport: () => setExportDialogOpen(true),
+  });
 
   const handleBack = () => {
     navigate('/');

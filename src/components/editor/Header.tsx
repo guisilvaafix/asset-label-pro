@@ -25,6 +25,7 @@ import { Slider } from '@/components/ui/slider';
 import { Toggle } from '@/components/ui/toggle';
 import { useLabelStore } from '@/store/labelStore';
 import { toast } from 'sonner';
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 
 interface HeaderProps {
   onExport: () => void;
@@ -175,6 +176,8 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onGenerateLay
           <FileText className="h-4 w-4" />
           Gerar Layout
         </Button>
+
+        <KeyboardShortcutsHelp />
 
         <Button onClick={onExport} className="gap-2">
           <FileDown className="h-4 w-4" />

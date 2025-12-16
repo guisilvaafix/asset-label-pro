@@ -9,6 +9,8 @@ import {
   ExportConfig,
   PAPER_SIZES
 } from '@/types/label';
+import { labelElementSchema, sheetConfigSchema, sequentialConfigSchema } from '@/schemas/labelSchemas';
+import { validateData } from '@/utils/validation';
 
 interface LabelState {
   // Sheet configuration
@@ -129,29 +131,43 @@ export const useLabelStore = create<LabelState>()(
           console.warn('Configurações da chapa bloqueadas pela O.S');
           return;
         }
+
+        const newConfig = { ...state.sheetConfig, ...config };
+
+        // Validar configuração
+        const validation = validateData(sheetConfigSchema, newConfig, {
+          showToast: true,
+          toastTitle: 'Erro na configuração da chapa',
+        });
+
+        if (!validation.success) {
+          console.error('Validação falhou:', validation.errors);
+          return;
+        }
+
         set((state) => {
-          const newConfig = { ...state.sheetConfig, ...config };
+          const validConfig = validation.data! as SheetConfig;
 
           // Auto-calculate columns and rows if enabled
-          if (newConfig.autoCalculate) {
-            const paper = PAPER_SIZES[newConfig.paperSize] || {
-              width: newConfig.customWidth,
-              height: newConfig.customHeight
+          if (validConfig.autoCalculate) {
+            const paper = PAPER_SIZES[validConfig.paperSize] || {
+              width: validConfig.customWidth,
+              height: validConfig.customHeight
             };
-            const availableWidth = paper.width - newConfig.marginLeft - newConfig.marginRight;
-            const availableHeight = paper.height - newConfig.marginTop - newConfig.marginBottom;
+            const availableWidth = paper.width - validConfig.marginLeft - validConfig.marginRight;
+            const availableHeight = paper.height - validConfig.marginTop - validConfig.marginBottom;
 
-            newConfig.columns = Math.floor(
-              (availableWidth + newConfig.spacingHorizontal) /
-              (newConfig.labelWidth + newConfig.spacingHorizontal)
+            validConfig.columns = Math.floor(
+              (availableWidth + validConfig.spacingHorizontal) /
+              (validConfig.labelWidth + validConfig.spacingHorizontal)
             );
-            newConfig.rows = Math.floor(
-              (availableHeight + newConfig.spacingVertical) /
-              (newConfig.labelHeight + newConfig.spacingVertical)
+            validConfig.rows = Math.floor(
+              (availableHeight + validConfig.spacingVertical) /
+              (validConfig.labelHeight + validConfig.spacingVertical)
             );
           }
 
-          return { sheetConfig: newConfig };
+          return { sheetConfig: validConfig };
         });
       },
 
@@ -166,17 +182,30 @@ export const useLabelStore = create<LabelState>()(
       history: [defaultElements],
       historyIndex: 0,
 
-      addElement: (element) => set((state) => {
-        const newElements = [...state.elements, element];
-        const newHistory = state.history.slice(0, state.historyIndex + 1);
-        newHistory.push(JSON.parse(JSON.stringify(newElements))); // Deep copy
+      addElement: (element) => {
+        // Validar elemento antes de adicionar
+        const validation = validateData(labelElementSchema, element, {
+          showToast: true,
+          toastTitle: 'Erro ao adicionar elemento',
+        });
 
-        return {
-          elements: newElements,
-          history: newHistory.slice(-50), // Manter apenas últimos 50 estados
-          historyIndex: Math.min(newHistory.length - 1, 49),
-        };
-      }),
+        if (!validation.success) {
+          console.error('Validação do elemento falhou:', validation.errors);
+          return;
+        }
+
+        set((state) => {
+          const newElements = [...state.elements, validation.data! as LabelElement];
+          const newHistory = state.history.slice(0, state.historyIndex + 1);
+          newHistory.push(JSON.parse(JSON.stringify(newElements))); // Deep copy
+
+          return {
+            elements: newElements,
+            history: newHistory.slice(-50), // Manter apenas últimos 50 estados
+            historyIndex: Math.min(newHistory.length - 1, 49),
+          };
+        });
+      },
 
       updateElement: (id, updates) => set((state) => {
         const newElements = state.elements.map((el) =>
@@ -309,9 +338,23 @@ export const useLabelStore = create<LabelState>()(
       dataMode: 'sequential',
       setDataMode: (mode) => set({ dataMode: mode }),
       sequentialConfig: defaultSequentialConfig,
-      setSequentialConfig: (config) => set((state) => ({
-        sequentialConfig: { ...state.sequentialConfig, ...config },
-      })),
+      setSequentialConfig: (config) => {
+        const state = get();
+        const newConfig = { ...state.sequentialConfig, ...config };
+
+        // Validar configuração sequencial
+        const validation = validateData(sequentialConfigSchema, newConfig, {
+          showToast: true,
+          toastTitle: 'Erro na configuração sequencial',
+        });
+
+        if (!validation.success) {
+          console.error('Validação falhou:', validation.errors);
+          return;
+        }
+
+        set({ sequentialConfig: validation.data! as SequentialConfig });
+      },
       csvData: [],
       csvHeaders: [],
       setCsvData: (data, headers) => set({ csvData: data, csvHeaders: headers }),

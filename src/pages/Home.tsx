@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { LabelThumbnail } from '@/components/os/LabelThumbnail';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -261,9 +262,39 @@ export default function Home() {
               {filteredAndSortedOS.map((os) => (
                 <Card
                   key={os.id}
-                  className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-primary/50 group"
+                  className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-primary/50 group overflow-hidden"
                   onClick={() => handleOpenOS(os.id)}
                 >
+                  {/* Preview da Etiqueta */}
+                  <div className="relative bg-gradient-to-br from-muted/30 to-muted/10 p-4 border-b border-border">
+                    <div className="flex items-center justify-center">
+                      {os.elements && os.elements.length > 0 ? (
+                        <LabelThumbnail
+                          elements={os.elements}
+                          width={280}
+                          height={160}
+                          className="shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-[280px] h-[160px] flex items-center justify-center bg-muted/50 rounded border-2 border-dashed border-border">
+                          <div className="text-center text-muted-foreground">
+                            <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs">Sem elementos</p>
+                            <p className="text-xs opacity-70">Adicione elementos no editor</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Badge de quantidade de elementos */}
+                    {os.elements && os.elements.length > 0 && (
+                      <div className="absolute top-2 right-2">
+                        <Badge variant="secondary" className="text-xs shadow-sm">
+                          {os.elements.length} {os.elements.length === 1 ? 'elemento' : 'elementos'}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -318,7 +349,27 @@ export default function Home() {
                       </DropdownMenu>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0">
+                  <CardContent className="pt-0 space-y-3">
+                    {/* Informações da Chapa */}
+                    {os.config && (
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground pb-2 border-b border-border">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">📄</span>
+                          <span>{os.config.paperSize || 'A4'}</span>
+                        </div>
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">🏷️</span>
+                          <span>{os.config.labelWidth}×{os.config.labelHeight}mm</span>
+                        </div>
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">📊</span>
+                          <span>{os.config.columns}×{os.config.rows}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
