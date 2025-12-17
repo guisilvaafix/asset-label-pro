@@ -29,7 +29,7 @@ const THICKNESSES = ['0,1', '0,15', '0,30', '0,5'];
 
 export function GenerateLayoutModal({ open, onOpenChange, osId }: GenerateLayoutModalProps) {
     const { getOS } = useOSStore();
-    const { elements, sheetConfig } = useLabelStore();
+    const { elements, sheetConfig, sequentialConfig } = useLabelStore();
     const [isGenerating, setIsGenerating] = useState(false);
 
     const os = getOS(osId);
@@ -72,315 +72,505 @@ export function GenerateLayoutModal({ open, onOpenChange, osId }: GenerateLayout
 
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            const margin = 15;
+            const margin = 12;
             let yPosition = margin;
 
-            // Cores da paleta laranja
-            const primaryOrange = [255, 140, 0]; // Laranja principal
-            const lightOrange = [255, 248, 240]; // Laranja claro
-            const darkOrange = [230, 120, 0]; // Laranja escuro
-            const warningRed = [220, 53, 69]; // Vermelho para avisos
+            // Paleta minimalista moderna
+            const primary = [45, 55, 72];        // Cinza escuro azulado
+            const secondary = [100, 116, 139];   // Cinza médio
+            const accent = [59, 130, 246];       // Azul moderno
+            const lightBg = [248, 250, 252];     // Cinza muito claro
+            const border = [226, 232, 240];      // Borda suave
 
-            // Header com gradiente simulado
-            pdf.setFillColor(255, 250, 245);
-            pdf.rect(0, 0, pageWidth, 30, 'F');
+            // ===== HEADER MINIMALISTA (COMPACTO - 2 LINHAS) =====
+            pdf.setFillColor(255, 255, 255);
+            pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-            // Logo/Marca
+            // LINHA 1: Logo + Data
             pdf.setFontSize(16);
-            pdf.setTextColor(darkOrange[0], darkOrange[1], darkOrange[2]);
+            pdf.setTextColor(primary[0], primary[1], primary[2]);
             pdf.setFont(undefined, 'bold');
-            pdf.text('AFIXGRAF', margin, 12);
+            pdf.text('AFIXGRAF', margin, yPosition + 4);
 
-            // Título
-            pdf.setFontSize(18);
-            pdf.setTextColor(30, 30, 30);
-            pdf.text('Relatório de Aprovação Específico', margin, 22);
-
-            // Número da página
+            // Data de geração (alinhada à direita)
             pdf.setFontSize(9);
-            pdf.setTextColor(120, 120, 120);
-            pdf.text(`Página 1`, pageWidth - margin - 15, 12);
-
-            yPosition = 38;
-
-            // Informações da O.S em cards
-            pdf.setFillColor(255, 250, 245);
-            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 20, 2, 2, 'F');
-
-            pdf.setFontSize(10);
-            pdf.setTextColor(80, 80, 80);
-            pdf.setFont(undefined, 'bold');
-            pdf.text('Ordem de Serviço:', margin + 3, yPosition + 6);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
             pdf.setFont(undefined, 'normal');
-            pdf.setTextColor(50, 50, 50);
-            pdf.text(os.name, margin + 3, yPosition + 11);
+            const dateText = new Date().toLocaleDateString('pt-BR');
+            pdf.text(dateText, pageWidth - margin, yPosition + 4, { align: 'right' });
+
+            yPosition += 9;
+
+            // LINHA 2: Número da O.S. + Cliente (ambos em negrito, alinhados à esquerda)
+            pdf.setFontSize(11);
+            pdf.setTextColor(primary[0], primary[1], primary[2]);
+            pdf.setFont(undefined, 'bold');
+            const osNameWidth = pdf.getTextWidth(os.name);
+            pdf.text(os.name, margin, yPosition + 3);
 
             if (os.clientCode && os.clientRazaoSocial) {
-                pdf.setFont(undefined, 'bold');
-                pdf.setTextColor(80, 80, 80);
-                pdf.text('Cliente:', margin + 3, yPosition + 16);
-                pdf.setFont(undefined, 'normal');
-                pdf.setTextColor(50, 50, 50);
-                pdf.text(`${os.clientCode} - ${os.clientRazaoSocial}`, margin + 20, yPosition + 16);
+                const clientText = `${os.clientCode} - ${os.clientRazaoSocial}`;
+                // Posicionar após o nome da O.S. com espaço adequado
+                const clientX = margin + osNameWidth + 8;
+                const maxWidth = pageWidth - margin - clientX;
+                const truncatedClient = pdf.splitTextToSize(clientText, maxWidth)[0];
+                pdf.text(truncatedClient, clientX, yPosition + 3);
             }
+
+            yPosition += 8;
+
+            // Linha divisória
+            pdf.setDrawColor(border[0], border[1], border[2]);
+            pdf.setLineWidth(0.3);
+            pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+
+            yPosition += 10;
+
+            // ===== RENDERIZAR ETIQUETA EM TAMANHO REAL =====
+            const labelWidth = os?.config?.labelWidth || sheetConfig.labelWidth;
+            const labelHeight = os?.config?.labelHeight || sheetConfig.labelHeight;
+
+            // Título da seção
+            pdf.setFontSize(10);
+            pdf.setTextColor(primary[0], primary[1], primary[2]);
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Preview da Etiqueta (Tamanho Real)', margin, yPosition);
+
+            pdf.setFontSize(8);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+            pdf.setFont(undefined, 'normal');
+            pdf.text(`Dimensões: ${labelWidth} × ${labelHeight} mm`, margin, yPosition + 4);
+
+            yPosition += 10;
+
+            // Calcular posição centralizada para a etiqueta
+            const labelX = (pageWidth - labelWidth) / 2;
+            const labelY = yPosition;
+
+            // Fundo da etiqueta baseado no material
+            const isAluminum = formData.material.toLowerCase().includes('alumínio') ||
+                formData.material.toLowerCase().includes('aluminio');
+
+            if (isAluminum) {
+                pdf.setFillColor(245, 245, 245);
+            } else {
+                pdf.setFillColor(255, 255, 255);
+            }
+            pdf.roundedRect(labelX, labelY, labelWidth, labelHeight, 1.5, 1.5, 'F');
+
+            // Borda da etiqueta
+            pdf.setDrawColor(border[0], border[1], border[2]);
+            pdf.setLineWidth(0.3);
+            pdf.roundedRect(labelX, labelY, labelWidth, labelHeight, 1.5, 1.5, 'S');
+
+            // Renderizar elementos da etiqueta
+            const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
+
+            for (const element of sortedElements) {
+                const elemX = labelX + element.x;
+                const elemY = labelY + element.y;
+
+                pdf.saveGraphicsState();
+                if (element.opacity < 1) {
+                    pdf.setGState({ opacity: element.opacity });
+                }
+
+                try {
+                    switch (element.type) {
+                        case 'text': {
+                            let text = element.text || '';
+                            if (element.isDynamic) {
+                                // Substituir campos dinâmicos com dados de exemplo
+                                text = text.replace(/{PREFIXO}/g, sequentialConfig.prefix || '');
+                                text = text.replace(/{NUMERO}/g, sequentialConfig.start.toString().padStart(sequentialConfig.padLength, '0'));
+                                text = text.replace(/{SUFIXO}/g, sequentialConfig.suffix || '');
+                            }
+
+                            pdf.setFontSize(element.fontSize || 12);
+                            pdf.setFont(undefined, element.fontWeight === 'bold' ? 'bold' : 'normal');
+
+                            // Converter cor hex para RGB
+                            const color = element.fill || '#000000';
+                            const r = parseInt(color.slice(1, 3), 16);
+                            const g = parseInt(color.slice(3, 5), 16);
+                            const b = parseInt(color.slice(5, 7), 16);
+                            pdf.setTextColor(r, g, b);
+
+                            const textAlign = element.textAlign as 'left' | 'center' | 'right' || 'left';
+                            let textX = elemX;
+                            if (textAlign === 'center') {
+                                textX = elemX + element.width / 2;
+                            } else if (textAlign === 'right') {
+                                textX = elemX + element.width;
+                            }
+
+                            pdf.text(text, textX, elemY + element.height / 2, {
+                                align: textAlign,
+                                baseline: 'middle'
+                            });
+                            break;
+                        }
+
+                        case 'qrcode': {
+                            let value = element.qrValue || 'SAMPLE';
+                            if (element.isDynamic) {
+                                value = value.replace(/{PREFIXO}/g, sequentialConfig.prefix || '');
+                                value = value.replace(/{NUMERO}/g, sequentialConfig.start.toString().padStart(sequentialConfig.padLength, '0'));
+                                value = value.replace(/{SUFIXO}/g, sequentialConfig.suffix || '');
+                            }
+
+                            try {
+                                const { generateQRCode } = await import('@/utils/barcodeGenerator');
+                                const qrDataUrl = await generateQRCode(value, {
+                                    width: Math.round(element.width * 10),
+                                    errorCorrectionLevel: element.qrErrorLevel || 'M',
+                                    color: {
+                                        dark: element.qrForeground || '#000000',
+                                        light: element.qrBackground || '#ffffff',
+                                    },
+                                });
+                                pdf.addImage(qrDataUrl, 'PNG', elemX, elemY, element.width, element.height);
+                            } catch (error) {
+                                console.warn('Erro ao gerar QR code:', error);
+                            }
+                            break;
+                        }
+
+                        case 'barcode':
+                        case 'datamatrix':
+                        case 'pdf417': {
+                            let value = element.barcodeValue || '000001';
+                            if (element.isDynamic) {
+                                value = value.replace(/{PREFIXO}/g, sequentialConfig.prefix || '');
+                                value = value.replace(/{NUMERO}/g, sequentialConfig.start.toString().padStart(sequentialConfig.padLength, '0'));
+                                value = value.replace(/{SUFIXO}/g, sequentialConfig.suffix || '');
+                            }
+
+                            try {
+                                const { generateBarcode } = await import('@/utils/barcodeGenerator');
+                                const barcodeType = element.type === 'datamatrix' ? 'DATAMATRIX' :
+                                    element.type === 'pdf417' ? 'PDF417' :
+                                        element.barcodeType || 'CODE128';
+
+                                const barcodeDataUrl = await generateBarcode(value, barcodeType, {
+                                    height: Math.round(element.height * 10),
+                                    displayValue: element.displayValue !== false,
+                                });
+                                pdf.addImage(barcodeDataUrl, 'PNG', elemX, elemY, element.width, element.height);
+                            } catch (error) {
+                                console.warn('Erro ao gerar código de barras:', error);
+                            }
+                            break;
+                        }
+
+                        case 'image': {
+                            if (element.src) {
+                                try {
+                                    // Verificar se é SVG
+                                    const isSVG = element.src.includes('data:image/svg+xml') ||
+                                        element.src.toLowerCase().includes('.svg');
+
+                                    if (isSVG) {
+                                        // SVG precisa ser convertido para PNG via canvas
+                                        const img = new Image();
+                                        img.src = element.src;
+
+                                        await new Promise<void>((resolve, reject) => {
+                                            img.onload = () => {
+                                                try {
+                                                    const canvas = document.createElement('canvas');
+                                                    const scale = 3; // Alta resolução
+                                                    canvas.width = element.width * 10 * scale;
+                                                    canvas.height = element.height * 10 * scale;
+                                                    const ctx = canvas.getContext('2d');
+
+                                                    if (ctx) {
+                                                        ctx.scale(scale, scale);
+                                                        ctx.drawImage(img, 0, 0, element.width * 10, element.height * 10);
+                                                        const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+                                                        pdf.addImage(pngDataUrl, 'PNG', elemX, elemY, element.width, element.height);
+                                                    }
+                                                    resolve();
+                                                } catch (err) {
+                                                    console.warn('Erro ao converter SVG:', err);
+                                                    reject(err);
+                                                }
+                                            };
+                                            img.onerror = () => {
+                                                console.warn('Erro ao carregar SVG');
+                                                reject(new Error('Failed to load SVG'));
+                                            };
+                                        });
+                                    } else {
+                                        // Para imagens raster (PNG, JPEG, WEBP)
+                                        let format: 'PNG' | 'JPEG' | 'WEBP' = 'PNG';
+
+                                        if (element.src.includes('data:image/jpeg') || element.src.includes('data:image/jpg')) {
+                                            format = 'JPEG';
+                                        } else if (element.src.includes('data:image/webp')) {
+                                            format = 'WEBP';
+                                        }
+
+                                        pdf.addImage(element.src, format, elemX, elemY, element.width, element.height);
+                                    }
+                                } catch (error) {
+                                    console.warn('Erro ao adicionar imagem:', error, element.src?.substring(0, 100));
+                                    // Desenhar placeholder se falhar
+                                    pdf.setDrawColor(200, 200, 200);
+                                    pdf.setLineWidth(0.5);
+                                    pdf.rect(elemX, elemY, element.width, element.height, 'S');
+                                    pdf.setFontSize(6);
+                                    pdf.setTextColor(150, 150, 150);
+                                    pdf.text('[Imagem]', elemX + element.width / 2, elemY + element.height / 2, {
+                                        align: 'center',
+                                        baseline: 'middle'
+                                    });
+                                }
+                            }
+                            break;
+                        }
+
+                        case 'rectangle': {
+                            if (element.shapeFill && element.shapeFill !== 'transparent') {
+                                const fillColor = element.shapeFill;
+                                const r = parseInt(fillColor.slice(1, 3), 16);
+                                const g = parseInt(fillColor.slice(3, 5), 16);
+                                const b = parseInt(fillColor.slice(5, 7), 16);
+                                pdf.setFillColor(r, g, b);
+                            }
+
+                            if (element.shapeStroke && element.shapeStroke !== 'transparent') {
+                                const strokeColor = element.shapeStroke;
+                                const r = parseInt(strokeColor.slice(1, 3), 16);
+                                const g = parseInt(strokeColor.slice(3, 5), 16);
+                                const b = parseInt(strokeColor.slice(5, 7), 16);
+                                pdf.setDrawColor(r, g, b);
+                                pdf.setLineWidth(element.shapeStrokeWidth || 1);
+                            }
+
+                            const style = element.shapeFill && element.shapeFill !== 'transparent' ?
+                                (element.shapeStroke && element.shapeStroke !== 'transparent' ? 'FD' : 'F') :
+                                'S';
+
+                            if (element.cornerRadius && element.cornerRadius > 0) {
+                                pdf.roundedRect(elemX, elemY, element.width, element.height, element.cornerRadius, element.cornerRadius, style);
+                            } else {
+                                pdf.rect(elemX, elemY, element.width, element.height, style);
+                            }
+                            break;
+                        }
+
+                        case 'circle': {
+                            const centerX = elemX + element.width / 2;
+                            const centerY = elemY + element.height / 2;
+                            const radiusX = element.width / 2;
+                            const radiusY = element.height / 2;
+
+                            if (element.shapeFill && element.shapeFill !== 'transparent') {
+                                const fillColor = element.shapeFill;
+                                const r = parseInt(fillColor.slice(1, 3), 16);
+                                const g = parseInt(fillColor.slice(3, 5), 16);
+                                const b = parseInt(fillColor.slice(5, 7), 16);
+                                pdf.setFillColor(r, g, b);
+                            }
+
+                            if (element.shapeStroke && element.shapeStroke !== 'transparent') {
+                                const strokeColor = element.shapeStroke;
+                                const r = parseInt(strokeColor.slice(1, 3), 16);
+                                const g = parseInt(strokeColor.slice(3, 5), 16);
+                                const b = parseInt(strokeColor.slice(5, 7), 16);
+                                pdf.setDrawColor(r, g, b);
+                                pdf.setLineWidth(element.shapeStrokeWidth || 1);
+                            }
+
+                            const style = element.shapeFill && element.shapeFill !== 'transparent' ?
+                                (element.shapeStroke && element.shapeStroke !== 'transparent' ? 'FD' : 'F') :
+                                'S';
+
+                            pdf.ellipse(centerX, centerY, radiusX, radiusY, style);
+                            break;
+                        }
+
+                        case 'line': {
+                            if (element.shapeStroke && element.shapeStroke !== 'transparent') {
+                                const strokeColor = element.shapeStroke;
+                                const r = parseInt(strokeColor.slice(1, 3), 16);
+                                const g = parseInt(strokeColor.slice(3, 5), 16);
+                                const b = parseInt(strokeColor.slice(5, 7), 16);
+                                pdf.setDrawColor(r, g, b);
+                                pdf.setLineWidth(element.shapeStrokeWidth || 1);
+                            }
+                            pdf.line(elemX, elemY, elemX + element.width, elemY);
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Erro ao renderizar elemento ${element.type}:`, error);
+                }
+
+                pdf.restoreGraphicsState();
+            }
+
+            yPosition += labelHeight + 25;
+
+            // ===== ESPECIFICAÇÕES TÉCNICAS (GRID MINIMALISTA) =====
+            pdf.setFontSize(10);
+            pdf.setTextColor(primary[0], primary[1], primary[2]);
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Especificações Técnicas', margin, yPosition);
+
+            yPosition += 8;
+
+            // Grid de especificações
+            const specs = [
+                { label: 'Material', value: formData.material, highlight: true },
+                { label: 'Espessura', value: `${formData.thickness}mm`, highlight: true },
+                { label: 'Dimensão', value: formData.dimension, highlight: false },
+                { label: 'Rebite', value: formData.rebite, highlight: formData.rebite === 'Sim' },
+                { label: 'Adesivo', value: formData.adhesive, highlight: formData.adhesive === 'Sim' },
+                { label: 'Bisnaga de Cola', value: formData.bisnagaCola, highlight: formData.bisnagaCola === 'Sim' },
+                { label: 'Cor dados variáveis', value: formData.frontColor, highlight: false },
+                { label: 'Cor do logo', value: formData.backColor, highlight: false },
+                { label: 'Acabamento', value: formData.finish, highlight: false },
+                { label: 'Padrão', value: formData.printType, highlight: false },
+            ];
+
+            const colWidth = (pageWidth - 2 * margin - 10) / 2;
+            let specX = margin;
+            let specY = yPosition;
+            let col = 0;
+
+            specs.forEach((spec, index) => {
+                // Alternar colunas
+                if (col === 2) {
+                    col = 0;
+                    specY += 12;
+                    specX = margin;
+                }
+
+                // Label
+                pdf.setFontSize(8);
+                pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+                pdf.setFont(undefined, 'normal');
+                pdf.text(spec.label, specX, specY);
+
+                // Value
+                pdf.setFontSize(9);
+                if (spec.highlight) {
+                    pdf.setTextColor(accent[0], accent[1], accent[2]);
+                    pdf.setFont(undefined, 'bold');
+                } else {
+                    pdf.setTextColor(primary[0], primary[1], primary[2]);
+                    pdf.setFont(undefined, 'normal');
+                }
+                pdf.text(spec.value, specX, specY + 4);
+
+                specX += colWidth + 5;
+                col++;
+            });
+
+            yPosition = specY + 15;
+
+            // ===== OBSERVAÇÕES =====
+            if (formData.observations) {
+                pdf.setFontSize(9);
+                pdf.setTextColor(primary[0], primary[1], primary[2]);
+                pdf.setFont(undefined, 'bold');
+                pdf.text('Observações', margin, yPosition);
+                yPosition += 5;
+
+                pdf.setFontSize(9);
+                pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+                pdf.setFont(undefined, 'normal');
+                const obsLines = pdf.splitTextToSize(formData.observations, pageWidth - 2 * margin);
+                pdf.text(obsLines, margin, yPosition);
+                yPosition += (obsLines.length * 4.5) + 8;
+            } else {
+                yPosition += 5;
+            }
+
+            // ===== ALERTA DE RESPONSABILIDADE =====
+            const warningRed = [220, 53, 69];
+            const lightRed = [254, 242, 242];
+
+            pdf.setFillColor(lightRed[0], lightRed[1], lightRed[2]);
+            pdf.setDrawColor(warningRed[0], warningRed[1], warningRed[2]);
+            pdf.setLineWidth(0.5);
+            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 20, 2, 2, 'FD');
+
+            pdf.setFontSize(9);
+            pdf.setTextColor(warningRed[0], warningRed[1], warningRed[2]);
+            pdf.setFont(undefined, 'bold');
+            pdf.text('ATENÇÃO', margin + 4, yPosition + 6);
+
+            pdf.setFontSize(8);
+            pdf.setFont(undefined, 'normal');
+            const disclaimerText = 'Este documento é de responsabilidade do cliente. Ao aprovar, o cliente se responsabiliza pela conferência de todas as informações.';
+            const disclaimerLines = pdf.splitTextToSize(disclaimerText, pageWidth - 2 * margin - 8);
+            pdf.text(disclaimerLines, margin + 4, yPosition + 11);
 
             yPosition += 25;
 
-            // Seção de Layout com cor laranja
-            pdf.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
-            pdf.rect(margin, yPosition, pageWidth - 2 * margin, 8, 'F');
-            pdf.setFontSize(12);
-            pdf.setFont(undefined, 'bold');
-            pdf.setTextColor(255, 255, 255);
-            pdf.text('Layout de Aprovação', margin + 3, yPosition + 5.5);
-            yPosition += 12;
-
-            // Capturar a imagem da etiqueta do canvas do editor SEM o grid
-            let labelImageData = null;
-            try {
-                // Procurar pelo canvas do LabelCanvas (menor canvas, que é o editor)
-                const canvasElements = document.querySelectorAll('canvas');
-                let labelCanvas: HTMLCanvasElement | null = null;
-                let minArea = Infinity;
-
-                // Encontrar o canvas menor (que é o LabelCanvas, não o SheetPreview)
-                canvasElements.forEach(canvas => {
-                    const area = canvas.width * canvas.height;
-                    // O LabelCanvas geralmente tem área entre 1000 e 100000 pixels
-                    if (area > 1000 && area < 100000 && area < minArea) {
-                        minArea = area;
-                        labelCanvas = canvas;
-                    }
-                });
-
-                if (labelCanvas) {
-                    // Criar canvas temporário para renderizar sem o grid
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = labelCanvas.width;
-                    tempCanvas.height = labelCanvas.height;
-                    const ctx = tempCanvas.getContext('2d');
-
-                    if (ctx) {
-                        // Fundo branco (ou cinza para alumínio)
-                        const isAluminum = formData.material.toLowerCase().includes('alumínio') ||
-                            formData.material.toLowerCase().includes('aluminio');
-                        ctx.fillStyle = isAluminum ? '#f5f5f5' : '#ffffff';
-                        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-                        // Copiar apenas o conteúdo do canvas original (sem o grid)
-                        ctx.drawImage(labelCanvas, 0, 0);
-
-                        labelImageData = tempCanvas.toDataURL('image/png');
-                    }
-                }
-            } catch (error) {
-                console.warn('Não foi possível capturar a prévia da etiqueta:', error);
-            }
-
-            // Container da prévia e características
-            const previewBoxHeight = 70;
-
-            // Box da prévia com sombra e cantos arredondados
-            pdf.setDrawColor(200, 200, 200);
-            pdf.setLineWidth(0.3);
-            pdf.setFillColor(250, 250, 250);
-            pdf.roundedRect(margin, yPosition, 95, previewBoxHeight, 3, 3, 'FD');
-
-            // Sombra simulada
-            pdf.setDrawColor(220, 220, 220);
-            pdf.setLineWidth(0.5);
-            pdf.line(margin + 1, yPosition + previewBoxHeight + 0.5, margin + 95, yPosition + previewBoxHeight + 0.5);
-            pdf.line(margin + 95 + 0.5, yPosition + 1, margin + 95 + 0.5, yPosition + previewBoxHeight);
-
-            if (labelImageData) {
-                try {
-                    // Calcular dimensões proporcionais da etiqueta
-                    const labelWidth = os?.config?.labelWidth || sheetConfig.labelWidth;
-                    const labelHeight = os?.config?.labelHeight || sheetConfig.labelHeight;
-                    const aspectRatio = labelWidth / labelHeight;
-
-                    // Definir tamanho máximo para a prévia
-                    const maxWidth = 80;
-                    const maxHeight = 55;
-
-                    let previewWidth = maxWidth;
-                    let previewHeight = maxWidth / aspectRatio;
-
-                    if (previewHeight > maxHeight) {
-                        previewHeight = maxHeight;
-                        previewWidth = maxHeight * aspectRatio;
-                    }
-
-                    // Centralizar a imagem
-                    const xOffset = margin + (95 - previewWidth) / 2;
-                    const yOffset = yPosition + (previewBoxHeight - previewHeight) / 2;
-
-                    // Adicionar a imagem
-                    pdf.addImage(labelImageData, 'PNG', xOffset, yOffset, previewWidth, previewHeight);
-                } catch (error) {
-                    console.warn('Erro ao adicionar imagem:', error);
-                    pdf.setFontSize(10);
-                    pdf.setTextColor(150, 150, 150);
-                    pdf.text('[Prévia da Etiqueta]', margin + 25, yPosition + previewBoxHeight / 2);
-                }
-            } else {
-                pdf.setFontSize(10);
-                pdf.setTextColor(150, 150, 150);
-                pdf.text('[Prévia da Etiqueta]', margin + 25, yPosition + previewBoxHeight / 2);
-            }
-
-            // Box de características com design melhorado
-            const charBoxX = margin + 100;
-            pdf.setFillColor(255, 250, 245);
-            pdf.roundedRect(charBoxX, yPosition, pageWidth - charBoxX - margin, previewBoxHeight, 2, 2, 'FD');
-
-            pdf.setFontSize(10);
-            pdf.setFont(undefined, 'bold');
-            pdf.setTextColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
-            pdf.text('CARACTERÍSTICAS DO MATERIAL', charBoxX + 3, yPosition + 6);
-
-            let charY = yPosition + 12;
-            const lineHeight = 5;
-
-            // Helper para destacar campos importantes
-            const addSpec = (label: string, value: string, highlight: boolean = false) => {
-                pdf.setFont(undefined, highlight ? 'bold' : 'normal');
-                pdf.setTextColor(highlight ? warningRed[0] : 60, highlight ? warningRed[1] : 60, highlight ? warningRed[2] : 60);
-                pdf.text(`${label}: ${value}`, charBoxX + 3, charY);
-                charY += lineHeight;
-            };
-
-            // Material - SEMPRE destacado
-            addSpec('Material', formData.material, true);
-
-            // Espessura - SEMPRE destacado
-            addSpec('Espessura', `${formData.thickness}mm`, true);
-
-            // Dimensão
-            addSpec('Dimensão', formData.dimension, false);
-
-            // Rebite - Destacar se for "Sim"
-            const hasRebite = formData.rebite.toLowerCase() === 'sim';
-            addSpec('Rebite', formData.rebite, hasRebite);
-
-            // Adesivo - Destacar se for "Sim"
-            const hasAdhesive = formData.adhesive.toLowerCase() === 'sim';
-            addSpec('Adesivo', formData.adhesive, hasAdhesive);
-
-            // Bisnaga de Cola - Destacar se for "Sim"
-            const hasBisnaga = formData.bisnagaCola.toLowerCase() === 'sim';
-            addSpec('Bisnaga de Cola', formData.bisnagaCola, hasBisnaga);
-
-            // Demais campos sem destaque
-            addSpec('Cor dados variáveis', formData.frontColor, false);
-            addSpec('Cor do logo', formData.backColor, false);
-            addSpec('Acabamento', formData.finish, false);
-            addSpec('Padrão', formData.printType, false);
-            addSpec('Nº de dígitos', formData.numberOfDigits, false);
-            addSpec('Código inicial', formData.numericalRange, false);
-
-            yPosition += previewBoxHeight + 8;
-
-            // Faixa numérica e quantidade em destaque (laranja claro)
-            pdf.setFillColor(lightOrange[0], lightOrange[1], lightOrange[2]);
-            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 15, 2, 2, 'F');
-
-            pdf.setFontSize(11);
-            pdf.setFont(undefined, 'bold');
-            pdf.setTextColor(50, 50, 50);
-            pdf.text(`Faixa Numérica: ${formData.numericalRange} até ${(parseInt(formData.numericalRange) + parseInt(formData.quantity) - 1).toString().padStart(formData.numericalRange.length, '0')}`, margin + 3, yPosition + 6);
-            pdf.text(`Quantidade: ${formData.quantity} unidades`, margin + 3, yPosition + 11);
-
-            yPosition += 20;
-
-            // Aviso importante com vermelho
-            pdf.setFillColor(255, 243, 243);
-            pdf.setDrawColor(warningRed[0], warningRed[1], warningRed[2]);
-            pdf.setLineWidth(0.8);
-            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 22, 2, 2, 'FD');
-
-            pdf.setTextColor(warningRed[0], warningRed[1], warningRed[2]);
-            pdf.setFontSize(8);
-            pdf.setFont(undefined, 'bold');
-            const warningLines = [
-                'ATENÇÃO: O CONTEÚDO DESTE FORMULÁRIO (FORMA DE FIXAÇÃO, FAIXA NUMÉRICA, ETC)',
-                'É DE RESPONSABILIDADE DO CLIENTE. AO APROVAR, FICARÁ IMPLÍCITO QUE O',
-                'FORMULÁRIO FOI CHECADO E VALIDADO, RESPONSABILIZANDO-SE POR EVENTUAIS',
-                'DIVERGÊNCIAS FUTURAS.'
-            ];
-
-            warningLines.forEach((line, index) => {
-                pdf.text(line, margin + 3, yPosition + 5 + (index * 4));
-            });
-
-            yPosition += 27;
-
-            // Observações
-            if (formData.observations) {
-                pdf.setFontSize(10);
-                pdf.setFont(undefined, 'bold');
-                pdf.setTextColor(80, 80, 80);
-                pdf.text('Observações:', margin, yPosition);
-                yPosition += 5;
-
-                pdf.setFont(undefined, 'normal');
-                pdf.setTextColor(60, 60, 60);
-                const obsLines = pdf.splitTextToSize(formData.observations, pageWidth - 2 * margin);
-                pdf.text(obsLines, margin, yPosition);
-                yPosition += (obsLines.length * 5) + 5;
-            } else {
-                pdf.setFontSize(10);
-                pdf.setFont(undefined, 'bold');
-                pdf.setTextColor(80, 80, 80);
-                pdf.text('Observações:', margin, yPosition);
-                yPosition += 6;
-
-                pdf.setDrawColor(200, 200, 200);
-                for (let i = 0; i < 3; i++) {
-                    pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-                    yPosition += 7;
-                }
-                yPosition += 3;
-            }
-
-            // Seção de aprovação com design melhorado (laranja)
-            pdf.setFillColor(255, 250, 245);
-            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 45, 2, 2, 'F');
-
-            pdf.setFontSize(11);
-            pdf.setFont(undefined, 'bold');
-            pdf.setTextColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
-            pdf.text('Conferência, Aprovação e Autorização do Cliente', margin + 3, yPosition + 6);
+            // ===== FAIXA NUMÉRICA (DESTAQUE) =====
+            pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 18, 2, 2, 'F');
 
             pdf.setFontSize(9);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
             pdf.setFont(undefined, 'normal');
-            pdf.setTextColor(80, 80, 80);
-            pdf.text('Aprovo a arte e autorizo a execução do serviço.', margin + 3, yPosition + 12);
+            pdf.text('Faixa Numérica', margin + 4, yPosition + 5);
+
+            pdf.setFontSize(11);
+            pdf.setTextColor(primary[0], primary[1], primary[2]);
+            pdf.setFont(undefined, 'bold');
+            const finalNumber = (parseInt(formData.numericalRange) + parseInt(formData.quantity) - 1).toString().padStart(formData.numericalRange.length, '0');
+            pdf.text(`${formData.numericalRange} até ${finalNumber}`, margin + 4, yPosition + 10);
+
+            pdf.setFontSize(9);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+            pdf.setFont(undefined, 'normal');
+            pdf.text(`Quantidade: ${formData.quantity} unidades`, margin + 4, yPosition + 15);
+
+            yPosition += 23;
+
+            // ===== APROVAÇÃO (MINIMALISTA) =====
+            pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+            pdf.roundedRect(margin, yPosition, pageWidth - 2 * margin, 40, 2, 2, 'F');
+
+            pdf.setFontSize(10);
+            pdf.setTextColor(primary[0], primary[1], primary[2]);
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Aprovação do Cliente', margin + 4, yPosition + 6);
+
+            pdf.setFontSize(8);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+            pdf.setFont(undefined, 'normal');
+            pdf.text('Aprovo a arte e autorizo a execução do serviço conforme especificações acima.', margin + 4, yPosition + 11);
 
             yPosition += 17;
 
-            pdf.setDrawColor(180, 180, 180);
-            pdf.text('Layout aprovado:', margin + 3, yPosition);
-            pdf.line(margin + 35, yPosition, margin + 70, yPosition);
+            // Campos de assinatura
+            pdf.setDrawColor(border[0], border[1], border[2]);
+            pdf.setLineWidth(0.3);
 
-            yPosition += 7;
-            pdf.text('Nome:', margin + 3, yPosition);
-            pdf.line(margin + 18, yPosition, pageWidth - margin - 3, yPosition);
-
-            yPosition += 7;
-            pdf.text('Data:', margin + 3, yPosition);
-            pdf.line(margin + 15, yPosition, margin + 50, yPosition);
-            pdf.text('/', margin + 35, yPosition - 1);
-            pdf.text('/', margin + 45, yPosition - 1);
-
-            yPosition += 7;
-            pdf.text('Assinatura:', margin + 3, yPosition);
-            pdf.line(margin + 25, yPosition, pageWidth - margin - 3, yPosition);
-
-            // Rodapé
             pdf.setFontSize(8);
-            pdf.setTextColor(150, 150, 150);
-            pdf.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 10);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+
+            pdf.text('Nome:', margin + 4, yPosition);
+            pdf.line(margin + 18, yPosition, pageWidth - margin - 4, yPosition);
+
+            yPosition += 8;
+            pdf.text('Data:', margin + 4, yPosition);
+            pdf.line(margin + 15, yPosition, margin + 45, yPosition);
+            pdf.text('___/___/______', margin + 16, yPosition - 1);
+
+            pdf.text('Assinatura:', pageWidth / 2, yPosition);
+            pdf.line(pageWidth / 2 + 18, yPosition, pageWidth - margin - 4, yPosition);
+
+            // ===== RODAPÉ =====
+            pdf.setFontSize(7);
+            pdf.setTextColor(secondary[0], secondary[1], secondary[2]);
+            pdf.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 8);
 
             // Save PDF
             const fileName = `Layout_Aprovacao_${os.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pdf`;
