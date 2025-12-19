@@ -13,23 +13,30 @@ interface KeyboardShortcutsOptions {
  * Atalhos disponíveis:
  * - Ctrl+Z: Desfazer
  * - Ctrl+Y / Ctrl+Shift+Z: Refazer
- * - Ctrl+D: Duplicar elemento selecionado
- * - Delete: Remover elemento selecionado
+ * - Ctrl+D: Duplicar elemento(s) selecionado(s)
+ * - Delete: Remover elemento(s) selecionado(s)
  * - Arrow Keys: Mover elemento selecionado
  * - Ctrl+S: Salvar (customizável)
  * - Ctrl+E: Exportar (customizável)
+ * 
+ * Seleção múltipla:
+ * - Shift+Click: Adicionar/remover elementos da seleção
+ * - Arrastar área: Selecionar múltiplos elementos
  */
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
     const { enabled = true, onSave, onExport } = options;
 
     const {
         selectedElementId,
+        selectedElementIds,
         undo,
         redo,
         canUndo,
         canRedo,
         duplicateElement,
+        duplicateElements,
         removeElement,
+        removeElements,
         updateElement,
         elements,
     } = useLabelStore();
@@ -70,18 +77,23 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
                 return;
             }
 
-            // Ctrl+D - Duplicar elemento
+            // Ctrl+D - Duplicar elemento(s)
             if (ctrlKey && e.key === 'd') {
                 e.preventDefault();
-                if (selectedElementId) {
+                if (selectedElementIds.length > 1) {
+                    duplicateElements(selectedElementIds);
+                } else if (selectedElementId) {
                     duplicateElement(selectedElementId);
                 }
                 return;
             }
 
-            // Delete - Remover elemento
+            // Delete - Remover elemento(s)
             if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (selectedElementId && !ctrlKey) {
+                if (selectedElementIds.length > 1 && !ctrlKey) {
+                    e.preventDefault();
+                    removeElements(selectedElementIds);
+                } else if (selectedElementId && !ctrlKey) {
                     e.preventDefault();
                     removeElement(selectedElementId);
                 }
@@ -145,12 +157,15 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
     }, [
         enabled,
         selectedElementId,
+        selectedElementIds,
         undo,
         redo,
         canUndo,
         canRedo,
         duplicateElement,
+        duplicateElements,
         removeElement,
+        removeElements,
         updateElement,
         elements,
         onSave,

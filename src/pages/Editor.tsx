@@ -11,6 +11,8 @@ import { LabelCanvas } from '@/components/editor/LabelCanvas';
 import { SheetPreview } from '@/components/editor/SheetPreview';
 import { ExportDialog } from '@/components/editor/ExportDialog';
 import { GenerateLayoutModal } from '@/components/editor/GenerateLayoutModal';
+import { LayersPanel } from '@/components/editor/LayersPanel';
+import { AlignmentPanel } from '@/components/editor/AlignmentPanel';
 import { Database, LayoutTemplate, Save, Check } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useLabelStore } from '@/store/labelStore';
@@ -174,6 +176,7 @@ const Editor = () => {
 
         {/* Right Sidebar - Config & Properties */}
         <div className="w-80 border-l border-border flex flex-col bg-card h-full overflow-hidden">
+          {/* Tabs superiores - Props e Dados */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="m-2 grid grid-cols-2 flex-shrink-0">
               <TabsTrigger value="props" className="text-xs gap-1">
@@ -186,7 +189,8 @@ const Editor = () => {
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-hidden">
+            {/* Conteúdo das tabs superiores */}
+            <div className="flex-1 overflow-hidden min-h-0">
               <TabsContent value="props" className="m-0 p-0 h-full overflow-hidden">
                 <PropertiesPanel />
               </TabsContent>
@@ -195,6 +199,29 @@ const Editor = () => {
               </TabsContent>
             </div>
           </Tabs>
+
+          {/* Painéis inferiores - Camadas e Alinhamento */}
+          <div className="border-t border-border flex-shrink-0">
+            <Tabs defaultValue="layers" className="w-full">
+              <TabsList className="w-full grid grid-cols-2 rounded-none h-9">
+                <TabsTrigger value="layers" className="text-xs">
+                  Camadas
+                </TabsTrigger>
+                <TabsTrigger value="alignment" className="text-xs">
+                  Alinhamento
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="h-64 overflow-hidden">
+                <TabsContent value="layers" className="m-0 h-full">
+                  <LayersPanel />
+                </TabsContent>
+                <TabsContent value="alignment" className="m-0 h-full overflow-auto">
+                  <AlignmentPanel />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
         </div>
       </div>
 

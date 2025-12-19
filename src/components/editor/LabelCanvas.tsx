@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas as FabricCanvas, Rect, Circle, Line, IText, FabricImage, FabricObject } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle, Line, IText, FabricImage, FabricObject, ActiveSelection } from 'fabric';
 import '@/types/fabric-extensions.d';
 import { useLabelStore } from '@/store/labelStore';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
@@ -21,9 +21,13 @@ export function LabelCanvas() {
     sheetConfig,
     elements,
     selectedElementId,
+    selectedElementIds,
     setSelectedElement,
+    setSelectedElements,
     updateElement,
+    updateElements,
     removeElement,
+    removeElements,
     undo,
     redo,
     zoom,
@@ -52,7 +56,7 @@ export function LabelCanvas() {
       backgroundColor: '#ffffff',
       selection: true, // Permite seleção por área (arrastar)
       preserveObjectStacking: true,
-      // Habilita seleção múltipla
+      // Habilita seleção múltipla com Shift+Click
       fireRightClick: true,
       stopContextMenu: true,
     });
@@ -60,18 +64,101 @@ export function LabelCanvas() {
     fabricRef.current = canvas;
     setIsInitialized(true);
 
-    // Selection event
+    // Handler para seleção múltipla com Shift+Click
+    canvas.on('mouse:down', (e) => {
+      const pointer = e.e as MouseEvent;
+
+      // Se Shift está pressionado e há um objeto sob o cursor
+      if (pointer.shiftKey && e.target) {
+        const clickedObject = e.target as ExtendedFabricObject;
+
+        // Se não há data.id, não é um objeto editável
+        if (!clickedObject.data?.id) return;
+
+        const activeSelection = canvas.getActiveObject();
+
+        // Se já existe uma seleção ativa
+        if (activeSelection) {
+          // Se é uma seleção múltipla (ActiveSelection)
+          if (activeSelection.type === 'activeSelection') {
+            const selection = activeSelection as any;
+            const objects = selection.getObjects();
+
+            // Verificar se o objeto clicado já está na seleção
+            const isAlreadySelected = objects.some((obj: ExtendedFabricObject) =>
+              obj.data?.id === clickedObject.data?.id
+            );
+
+            if (isAlreadySelected) {
+              // Remover da seleção
+              selection.removeWithUpdate(clickedObject);
+              canvas.discardActiveObject();
+
+              const remaining = selection.getObjects();
+              if (remaining.length > 1) {
+                const newSelection = new ActiveSelection(remaining, {
+                  canvas: canvas,
+                });
+                canvas.setActiveObject(newSelection);
+              } else if (remaining.length === 1) {
+                canvas.setActiveObject(remaining[0]);
+              }
+            } else {
+              // Adicionar à seleção
+              selection.addWithUpdate(clickedObject);
+              canvas.setActiveObject(selection);
+            }
+
+            canvas.requestRenderAll();
+            e.e.preventDefault();
+            e.e.stopPropagation();
+          } else {
+            // É uma seleção única, criar ActiveSelection com os dois objetos
+            if (activeSelection !== clickedObject) {
+              canvas.discardActiveObject();
+              const newSelection = new ActiveSelection(
+                [activeSelection, clickedObject],
+                { canvas: canvas }
+              );
+              canvas.setActiveObject(newSelection);
+              canvas.requestRenderAll();
+              e.e.preventDefault();
+              e.e.stopPropagation();
+            }
+          }
+        }
+        // Se não há seleção, o comportamento padrão do Fabric.js vai selecionar o objeto
+      }
+    });
+
+    // Selection events
     canvas.on('selection:created', (e) => {
-      const selected = e.selected?.[0] as ExtendedFabricObject | undefined;
-      if (selected?.data?.id) {
-        setSelectedElement(selected.data.id);
+      const selected = e.selected;
+      if (selected && selected.length > 0) {
+        const selectedIds = selected
+          .map(obj => (obj as ExtendedFabricObject)?.data?.id)
+          .filter(Boolean) as string[];
+
+        if (selectedIds.length === 1) {
+          setSelectedElement(selectedIds[0]);
+        } else if (selectedIds.length > 1) {
+          setSelectedElements(selectedIds);
+        }
       }
     });
 
     canvas.on('selection:updated', (e) => {
-      const selected = e.selected?.[0] as ExtendedFabricObject | undefined;
-      if (selected?.data?.id) {
-        setSelectedElement(selected.data.id);
+      const selected = e.selected;
+      if (selected && selected.length > 0) {
+        const selectedIds = selected
+          .map(obj => (obj as ExtendedFabricObject)?.data?.id)
+          .filter(Boolean) as string[];
+
+        if (selectedIds.length === 1) {
+          setSelectedElement(selectedIds[0]);
+        } else if (selectedIds.length > 1) {
+          setSelectedElements(selectedIds);
+        }
       }
     });
 
@@ -81,22 +168,59 @@ export function LabelCanvas() {
 
     // Object modified event (move, resize, rotate)
     canvas.on('object:modified', (e) => {
-      const obj = e.target as ExtendedFabricObject | undefined;
-      if (obj?.data?.id) {
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
+      const target = e.target;
 
-        updateElement(obj.data.id, {
-          x: (obj.left || 0) / MM_TO_PX,
-          y: (obj.top || 0) / MM_TO_PX,
-          width: ((obj.width || 0) * scaleX) / MM_TO_PX,
-          height: ((obj.height || 0) * scaleY) / MM_TO_PX,
-          rotation: obj.angle || 0,
+      // Verificar se é uma seleção múltipla (ActiveSelection)
+      if (target && target.type === 'activeSelection') {
+        const activeSelection = target as any;
+        const objects = activeSelection.getObjects() as ExtendedFabricObject[];
+
+        objects.forEach((obj) => {
+          if (obj?.data?.id) {
+            const scaleX = obj.scaleX || 1;
+            const scaleY = obj.scaleY || 1;
+            const left = obj.left || 0;
+            const top = obj.top || 0;
+
+            // Calcular posição absoluta considerando o grupo
+            const groupLeft = activeSelection.left || 0;
+            const groupTop = activeSelection.top || 0;
+            const absoluteLeft = groupLeft + left;
+            const absoluteTop = groupTop + top;
+
+            updateElement(obj.data.id, {
+              x: absoluteLeft / MM_TO_PX,
+              y: absoluteTop / MM_TO_PX,
+              width: ((obj.width || 0) * scaleX) / MM_TO_PX,
+              height: ((obj.height || 0) * scaleY) / MM_TO_PX,
+              rotation: obj.angle || 0,
+            });
+
+            // Reset scale after updating dimensions
+            obj.set({ scaleX: 1, scaleY: 1 });
+          }
         });
 
-        // Reset scale after updating dimensions
-        obj.set({ scaleX: 1, scaleY: 1 });
         canvas.renderAll();
+      } else {
+        // Seleção única
+        const obj = target as ExtendedFabricObject | undefined;
+        if (obj?.data?.id) {
+          const scaleX = obj.scaleX || 1;
+          const scaleY = obj.scaleY || 1;
+
+          updateElement(obj.data.id, {
+            x: (obj.left || 0) / MM_TO_PX,
+            y: (obj.top || 0) / MM_TO_PX,
+            width: ((obj.width || 0) * scaleX) / MM_TO_PX,
+            height: ((obj.height || 0) * scaleY) / MM_TO_PX,
+            rotation: obj.angle || 0,
+          });
+
+          // Reset scale after updating dimensions
+          obj.set({ scaleX: 1, scaleY: 1 });
+          canvas.renderAll();
+        }
       }
     });
 
@@ -354,48 +478,112 @@ export function LabelCanvas() {
         return;
       }
 
-      // Delete ou Backspace para remover elemento
-      if ((e.key === 'Delete' || e.key === 'Backspace') && activeObject?.data?.id) {
+      // Delete ou Backspace para remover elemento(s)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && activeObject) {
         e.preventDefault();
-        removeElement(activeObject.data.id);
-        canvas.remove(activeObject);
-        canvas.renderAll();
+
+        // Verificar se é seleção múltipla
+        if (activeObject.type === 'activeSelection') {
+          const activeSelection = activeObject as any;
+          const objects = activeSelection.getObjects() as ExtendedFabricObject[];
+          const idsToRemove = objects
+            .map(obj => obj.data?.id)
+            .filter(Boolean) as string[];
+
+          if (idsToRemove.length > 0) {
+            removeElements(idsToRemove);
+            objects.forEach(obj => canvas.remove(obj));
+            canvas.discardActiveObject();
+            canvas.renderAll();
+          }
+        } else if (activeObject?.data?.id) {
+          // Seleção única
+          removeElement(activeObject.data.id);
+          canvas.remove(activeObject);
+          canvas.renderAll();
+        }
         return;
       }
 
-      // Setas para mover elemento
+      // Setas para mover elemento(s)
       if (activeObject && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
 
         const moveAmount = e.shiftKey ? 5 : 1; // 5mm com Shift, 1mm sem
-        const currentLeft = activeObject.left || 0;
-        const currentTop = activeObject.top || 0;
 
-        switch (e.key) {
-          case 'ArrowUp':
-            activeObject.set({ top: currentTop - moveAmount * MM_TO_PX });
-            break;
-          case 'ArrowDown':
-            activeObject.set({ top: currentTop + moveAmount * MM_TO_PX });
-            break;
-          case 'ArrowLeft':
-            activeObject.set({ left: currentLeft - moveAmount * MM_TO_PX });
-            break;
-          case 'ArrowRight':
-            activeObject.set({ left: currentLeft + moveAmount * MM_TO_PX });
-            break;
-        }
+        // Verificar se é seleção múltipla
+        if (activeObject.type === 'activeSelection') {
+          const activeSelection = activeObject as any;
+          const objects = activeSelection.getObjects() as ExtendedFabricObject[];
 
-        activeObject.setCoords();
-        canvas.renderAll();
+          objects.forEach(obj => {
+            const currentLeft = obj.left || 0;
+            const currentTop = obj.top || 0;
 
-        // Atualizar no store
-        if (activeObject.data?.id) {
-          updateElement(activeObject.data.id, {
-            x: (activeObject.left || 0) / MM_TO_PX,
-            y: (activeObject.top || 0) / MM_TO_PX,
+            switch (e.key) {
+              case 'ArrowUp':
+                obj.set({ top: currentTop - moveAmount * MM_TO_PX });
+                break;
+              case 'ArrowDown':
+                obj.set({ top: currentTop + moveAmount * MM_TO_PX });
+                break;
+              case 'ArrowLeft':
+                obj.set({ left: currentLeft - moveAmount * MM_TO_PX });
+                break;
+              case 'ArrowRight':
+                obj.set({ left: currentLeft + moveAmount * MM_TO_PX });
+                break;
+            }
+
+            obj.setCoords();
+
+            // Atualizar no store
+            if (obj.data?.id) {
+              const groupLeft = activeSelection.left || 0;
+              const groupTop = activeSelection.top || 0;
+              const absoluteLeft = groupLeft + (obj.left || 0);
+              const absoluteTop = groupTop + (obj.top || 0);
+
+              updateElement(obj.data.id, {
+                x: absoluteLeft / MM_TO_PX,
+                y: absoluteTop / MM_TO_PX,
+              });
+            }
           });
+
+          activeSelection.setCoords();
+        } else {
+          // Seleção única
+          const currentLeft = activeObject.left || 0;
+          const currentTop = activeObject.top || 0;
+
+          switch (e.key) {
+            case 'ArrowUp':
+              activeObject.set({ top: currentTop - moveAmount * MM_TO_PX });
+              break;
+            case 'ArrowDown':
+              activeObject.set({ top: currentTop + moveAmount * MM_TO_PX });
+              break;
+            case 'ArrowLeft':
+              activeObject.set({ left: currentLeft - moveAmount * MM_TO_PX });
+              break;
+            case 'ArrowRight':
+              activeObject.set({ left: currentLeft + moveAmount * MM_TO_PX });
+              break;
+          }
+
+          activeObject.setCoords();
+
+          // Atualizar no store
+          if (activeObject.data?.id) {
+            updateElement(activeObject.data.id, {
+              x: (activeObject.left || 0) / MM_TO_PX,
+              y: (activeObject.top || 0) / MM_TO_PX,
+            });
+          }
         }
+
+        canvas.renderAll();
       }
     };
 

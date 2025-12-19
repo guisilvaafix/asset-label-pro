@@ -17,12 +17,16 @@ const shortcuts: Shortcut[] = [
     // Edição
     { keys: ['Ctrl', 'Z'], description: 'Desfazer', category: 'Edição' },
     { keys: ['Ctrl', 'Y'], description: 'Refazer', category: 'Edição' },
-    { keys: ['Ctrl', 'D'], description: 'Duplicar elemento', category: 'Edição' },
-    { keys: ['Delete'], description: 'Remover elemento', category: 'Edição' },
+    { keys: ['Ctrl', 'D'], description: 'Duplicar elemento(s)', category: 'Edição' },
+    { keys: ['Delete'], description: 'Remover elemento(s)', category: 'Edição' },
+
+    // Seleção
+    { keys: ['Shift', 'Click'], description: 'Adicionar à seleção', category: 'Seleção' },
+    { keys: ['Arrastar'], description: 'Selecionar área', category: 'Seleção' },
 
     // Navegação
     { keys: ['←', '→', '↑', '↓'], description: 'Mover elemento (1mm)', category: 'Navegação' },
-    { keys: ['Shift', '←', '→', '↑', '↓'], description: 'Mover elemento (10mm)', category: 'Navegação' },
+    { keys: ['Shift', '←', '→', '↑', '↓'], description: 'Mover elemento (5mm)', category: 'Navegação' },
 
     // Ações
     { keys: ['Ctrl', 'S'], description: 'Salvar', category: 'Ações' },

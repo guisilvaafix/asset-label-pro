@@ -23,11 +23,16 @@ interface LabelState {
   // Canvas elements
   elements: LabelElement[];
   selectedElementId: string | null;
+  selectedElementIds: string[]; // Múltiplas seleções
   addElement: (element: LabelElement) => void;
   updateElement: (id: string, updates: Partial<LabelElement>) => void;
+  updateElements: (ids: string[], updates: Partial<LabelElement>) => void; // Atualizar múltiplos
   removeElement: (id: string) => void;
+  removeElements: (ids: string[]) => void; // Remover múltiplos
   setSelectedElement: (id: string | null) => void;
+  setSelectedElements: (ids: string[]) => void; // Selecionar múltiplos
   duplicateElement: (id: string) => void;
+  duplicateElements: (ids: string[]) => void; // Duplicar múltiplos
   moveElementLayer: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
 
   // Data generation
@@ -177,6 +182,7 @@ export const useLabelStore = create<LabelState>()(
       // Canvas elements
       elements: defaultElements,
       selectedElementId: null,
+      selectedElementIds: [],
 
       // History
       history: [defaultElements],
@@ -242,7 +248,70 @@ export const useLabelStore = create<LabelState>()(
         };
       }),
 
-      setSelectedElement: (id) => set({ selectedElementId: id }),
+      setSelectedElement: (id) => set({
+        selectedElementId: id,
+        selectedElementIds: id ? [id] : []
+      }),
+
+      setSelectedElements: (ids) => set({
+        selectedElementIds: ids,
+        selectedElementId: ids.length === 1 ? ids[0] : null
+      }),
+
+      updateElements: (ids, updates) => set((state) => {
+        const newElements = state.elements.map((el) =>
+          ids.includes(el.id) ? { ...el, ...updates } : el
+        );
+
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+        return {
+          elements: newElements,
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        };
+      }),
+
+      removeElements: (ids) => set((state) => {
+        const newElements = state.elements.filter((el) => !ids.includes(el.id));
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+        return {
+          elements: newElements,
+          selectedElementId: ids.includes(state.selectedElementId || '') ? null : state.selectedElementId,
+          selectedElementIds: state.selectedElementIds.filter(id => !ids.includes(id)),
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        };
+      }),
+
+      duplicateElements: (ids) => {
+        const state = get();
+        const elementsToDuplicate = state.elements.filter((el) => ids.includes(el.id));
+
+        if (elementsToDuplicate.length === 0) return;
+
+        const newElements = elementsToDuplicate.map((element) => ({
+          ...element,
+          id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          x: element.x + 2,
+          y: element.y + 2,
+        }));
+
+        const allElements = [...state.elements, ...newElements];
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(allElements)));
+
+        set({
+          elements: allElements,
+          selectedElementIds: newElements.map(el => el.id),
+          selectedElementId: newElements.length === 1 ? newElements[0].id : null,
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        });
+      },
 
       duplicateElement: (id) => {
         const state = get();
@@ -429,6 +498,7 @@ export const useLabelStore = create<LabelState>()(
         sheetConfigLocked: false,
         elements: defaultElements,
         selectedElementId: null,
+        selectedElementIds: [],
         sequentialConfig: defaultSequentialConfig,
         csvData: [],
         csvHeaders: [],
@@ -444,6 +514,7 @@ export const useLabelStore = create<LabelState>()(
         history: [JSON.parse(JSON.stringify(elements))],
         historyIndex: 0,
         selectedElementId: null,
+        selectedElementIds: [],
       }),
     }),
     {
