@@ -2,18 +2,20 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { Header } from '@/components/editor/Header';
-import { ElementsSidebar } from '@/components/editor/ElementsSidebar';
-import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
-import { DataPanel } from '@/components/editor/DataPanel';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { LabelCanvas } from '@/components/editor/LabelCanvas';
-import { SheetPreview } from '@/components/editor/SheetPreview';
+import { SheetPreviewModal } from '@/components/editor/SheetPreviewModal';
 import { ExportDialog } from '@/components/editor/ExportDialog';
 import { GenerateLayoutModal } from '@/components/editor/GenerateLayoutModal';
 import { LayersPanel } from '@/components/editor/LayersPanel';
 import { AlignmentPanel } from '@/components/editor/AlignmentPanel';
-import { Database, LayoutTemplate, Save, Check } from 'lucide-react';
+import { SelectionInfo } from '@/components/editor/SelectionInfo';
+import { Header } from '@/components/editor/Header';
+import { ElementsSidebar } from '@/components/editor/ElementsSidebar';
+import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
+import { DataPanel } from '@/components/editor/DataPanel';
+import { Database, LayoutTemplate, Eye, ZoomIn, ZoomOut, Save } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useLabelStore } from '@/store/labelStore';
 import { toast } from 'sonner';
@@ -25,9 +27,10 @@ const Editor = () => {
   const { osId } = useParams<{ osId: string }>();
   const navigate = useNavigate();
   const { getOS, updateOS, saveOSElements } = useOSStore();
-  const { elements, setSheetConfig, lockSheetConfig, resetToDefault, loadElements } = useLabelStore();
+  const { elements, setSheetConfig, lockSheetConfig, resetToDefault, loadElements, zoom, setZoom } = useLabelStore();
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [generateLayoutOpen, setGenerateLayoutOpen] = useState(false);
+  const [sheetPreviewOpen, setSheetPreviewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('props');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -140,7 +143,6 @@ const Editor = () => {
         onSaveTemplate={() => { }}
         onLoadTemplate={() => { }}
         onGenerateLayout={() => setGenerateLayoutOpen(true)}
-        onBack={handleBack}
         isSaving={isSaving}
         lastSaved={lastSaved}
       />
@@ -151,27 +153,78 @@ const Editor = () => {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
-            {/* Canvas Area */}
-            <ResizablePanel defaultSize={60} minSize={40}>
-              <div className="flex flex-col h-full">
-                <div className="border-b border-border px-4 py-2 bg-card">
-                  <h3 className="text-sm font-medium">Editor da Etiqueta</h3>
-                  <p className="text-xs text-muted-foreground">Arraste e edite os elementos</p>
+          <div className="flex flex-col h-full relative">
+            <div className="border-b border-border px-4 py-2 bg-card flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium">Editor da Etiqueta</h3>
+                <p className="text-xs text-muted-foreground">Arraste e edite os elementos</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSheetPreviewOpen(true)}
+                className="gap-2"
+              >
+                <Eye className="h-4 w-4" />
+                Preview da Chapa
+              </Button>
+            </div>
+            <LabelCanvas />
+
+            {/* Selection Info - Positioned relative to canvas */}
+            <SelectionInfo />
+
+            {/* Zoom Controls + Auto-save */}
+            <div className="border-t border-border px-4 py-2 bg-card flex items-center justify-between gap-3">
+              {/* Zoom Controls - Left */}
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setZoom(Math.max(10, zoom - 10))}
+                  disabled={zoom <= 10}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <Slider
+                  value={[zoom]}
+                  onValueChange={([value]) => setZoom(value)}
+                  min={10}
+                  max={500}
+                  step={10}
+                  className="w-48"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setZoom(Math.min(500, zoom + 10))}
+                  disabled={zoom >= 500}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground w-14 text-center font-mono">{zoom}%</span>
+              </div>
+
+              {/* Auto-save indicator - Right */}
+              {(isSaving || lastSaved) && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {isSaving ? (
+                    <>
+                      <Save className="h-3 w-3 animate-pulse" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : lastSaved ? (
+                    <>
+                      <Save className="h-3 w-3 text-green-600" />
+                      <span className="text-green-600">Salvo automaticamente</span>
+                    </>
+                  ) : null}
                 </div>
-                <LabelCanvas />
-              </div>
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            {/* Sheet Preview */}
-            <ResizablePanel defaultSize={40} minSize={20} maxSize={60}>
-              <div className="h-full flex flex-col bg-card">
-                <SheetPreview />
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Right Sidebar - Config & Properties */}
@@ -225,6 +278,7 @@ const Editor = () => {
         </div>
       </div>
 
+      <SheetPreviewModal open={sheetPreviewOpen} onOpenChange={setSheetPreviewOpen} />
       <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} />
       {osId && (
         <GenerateLayoutModal

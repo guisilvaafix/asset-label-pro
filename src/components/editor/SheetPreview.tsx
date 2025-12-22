@@ -142,7 +142,7 @@ export function SheetPreview() {
     canvas.height = paperHeightPx;
 
     // Background
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#f8f9fa';
     ctx.fillRect(0, 0, paperWidthPx, paperHeightPx);
 
     // Draw margins (subtle guides)
@@ -171,7 +171,7 @@ export function SheetPreview() {
         const labelHeight = sheetConfig.labelHeight * MM_TO_PX;
 
         // Label background
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#f8f9fa';
         ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
 
         // Label border

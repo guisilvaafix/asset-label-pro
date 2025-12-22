@@ -4,6 +4,8 @@ import '@/types/fabric-extensions.d';
 import { useLabelStore } from '@/store/labelStore';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
 import { generateElementSequenceData } from '@/utils/sequenceGenerator';
+import { CanvasWithRulers } from './CanvasWithRulers';
+import { CanvasHints } from './CanvasHints';
 
 const MM_TO_PX = 3.78; // Approximate conversion at 96 DPI
 
@@ -53,7 +55,7 @@ export function LabelCanvas() {
     const canvas = new FabricCanvas(canvasRef.current, {
       width: labelWidthPx,
       height: labelHeightPx,
-      backgroundColor: '#ffffff',
+      backgroundColor: '#f8f9fa',
       selection: true, // Permite seleção por área (arrastar)
       preserveObjectStacking: true,
       // Habilita seleção múltipla com Shift+Click
@@ -619,7 +621,7 @@ export function LabelCanvas() {
 
     // Clear canvas
     canvas.clear();
-    canvas.backgroundColor = '#ffffff';
+    canvas.backgroundColor = '#f8f9fa';
 
     // Draw grid if enabled
     if (showGrid) {
@@ -957,16 +959,26 @@ export function LabelCanvas() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-auto bg-muted/30 flex items-center justify-center p-8"
+      className="flex-1 overflow-auto bg-muted/30 flex items-center justify-center p-8 relative"
     >
+      {/* Show hints when canvas is empty */}
+      {elements.length === 0 && <CanvasHints />}
+
       <div
-        className="shadow-xl rounded-sm"
         style={{
           transform: `scale(${zoom / 100})`,
           transformOrigin: 'center center',
         }}
       >
-        <canvas ref={canvasRef} />
+        <CanvasWithRulers
+          width={labelWidthPx}
+          height={labelHeightPx}
+          mmToPx={MM_TO_PX}
+        >
+          <div className="shadow-xl rounded-sm overflow-hidden">
+            <canvas ref={canvasRef} />
+          </div>
+        </CanvasWithRulers>
       </div>
     </div>
   );

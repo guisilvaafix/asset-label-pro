@@ -9,18 +9,36 @@ import {
   Grid2X2,
   FileText,
   Hash,
-  Box
+  Shapes,
+  Home,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useNavigate } from 'react-router-dom';
 import { useLabelStore } from '@/store/labelStore';
 import { LabelElement, BARCODE_TYPES, DYNAMIC_FIELDS } from '@/types/label';
 import { toast } from 'sonner';
 
 export function ElementsSidebar() {
-  const { addElement, sheetConfig } = useLabelStore();
+  const { addElement } = useLabelStore();
+  const navigate = useNavigate();
 
   const createElement = (type: LabelElement['type'], extra: Partial<LabelElement> = {}): LabelElement => ({
     id: `${type}-${Date.now()}`,
@@ -49,7 +67,7 @@ export function ElementsSidebar() {
     toast.success('Texto adicionado');
   };
 
-  const handleAddDynamicField = (field: string) => {
+  const handleAddDynamicField = (field: string, label: string) => {
     const element = createElement('text', {
       text: field,
       fontFamily: 'Arial',
@@ -61,7 +79,7 @@ export function ElementsSidebar() {
       dynamicField: field,
     });
     addElement(element);
-    toast.success('Campo dinâmico adicionado');
+    toast.success(`${label} adicionado`);
   };
 
   const handleAddImage = () => {
@@ -102,7 +120,7 @@ export function ElementsSidebar() {
     toast.success('QR Code adicionado');
   };
 
-  const handleAddBarcode = (barcodeType: string) => {
+  const handleAddBarcode = (barcodeType: string, label: string) => {
     const element = createElement('barcode', {
       width: 30,
       height: 10,
@@ -113,7 +131,7 @@ export function ElementsSidebar() {
       dynamicField: '{NUMERO}',
     });
     addElement(element);
-    toast.success(`Código de barras ${barcodeType} adicionado`);
+    toast.success(`${label} adicionado`);
   };
 
   const handleAddDataMatrix = () => {
@@ -140,7 +158,7 @@ export function ElementsSidebar() {
     toast.success('PDF417 adicionado');
   };
 
-  const handleAddShape = (type: 'rectangle' | 'circle' | 'line') => {
+  const handleAddShape = (type: 'rectangle' | 'circle' | 'line', label: string) => {
     const element = createElement(type, {
       width: type === 'line' ? 20 : 15,
       height: type === 'line' ? 2 : 15,
@@ -150,186 +168,209 @@ export function ElementsSidebar() {
       cornerRadius: 0,
     });
     addElement(element);
-    toast.success('Forma adicionada');
+    toast.success(`${label} adicionado`);
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-card flex flex-col">
-      <div className="p-3 border-b border-border">
-        <h2 className="font-semibold text-sm">Elementos</h2>
-        <p className="text-xs text-muted-foreground">Arraste para o canvas</p>
-      </div>
-
-      <ScrollArea className="flex-1">
-        <div className="p-3">
-          <Accordion type="multiple" defaultValue={['basic', 'dynamic', 'codes', 'shapes']} className="space-y-2">
-            <AccordionItem value="basic" className="border-none">
-              <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
-                Básico
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-auto py-3 flex-col gap-1"
-                    onClick={handleAddText}
-                  >
-                    <Type className="h-5 w-5" />
-                    <span className="text-xs">Texto</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-auto py-3 flex-col gap-1"
-                    onClick={handleAddImage}
-                  >
-                    <Image className="h-5 w-5" />
-                    <span className="text-xs">Imagem</span>
-                  </Button>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="dynamic" className="border-none">
-              <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
-                Campos Dinâmicos
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-1">
-                  {DYNAMIC_FIELDS.slice(0, 6).map((field) => (
-                    <Button
-                      key={field.value}
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start h-8 text-xs"
-                      onClick={() => handleAddDynamicField(field.value)}
-                    >
-                      <Hash className="h-3 w-3 mr-2" />
-                      {field.label}
-                    </Button>
-                  ))}
-                  <Accordion type="single" collapsible>
-                    <AccordionItem value="more" className="border-none">
-                      <AccordionTrigger className="py-1 text-xs hover:no-underline">
-                        Mais campos...
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        {DYNAMIC_FIELDS.slice(6).map((field) => (
-                          <Button
-                            key={field.value}
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start h-8 text-xs"
-                            onClick={() => handleAddDynamicField(field.value)}
-                          >
-                            <Hash className="h-3 w-3 mr-2" />
-                            {field.label}
-                          </Button>
-                        ))}
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="codes" className="border-none">
-              <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
-                Códigos
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto py-3 flex-col gap-1"
-                      onClick={handleAddQRCode}
-                    >
-                      <QrCode className="h-5 w-5" />
-                      <span className="text-xs">QR Code</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto py-3 flex-col gap-1"
-                      onClick={handleAddDataMatrix}
-                    >
-                      <Grid2X2 className="h-5 w-5" />
-                      <span className="text-xs">DataMatrix</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto py-3 flex-col gap-1 col-span-2"
-                      onClick={handleAddPDF417}
-                    >
-                      <FileText className="h-5 w-5" />
-                      <span className="text-xs">PDF417</span>
-                    </Button>
-                  </div>
-
-                  <Separator />
-
-                  <p className="text-xs text-muted-foreground font-medium">Códigos de Barras 1D</p>
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {BARCODE_TYPES.map((type) => (
-                      <Button
-                        key={type.value}
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start h-8 text-xs"
-                        onClick={() => handleAddBarcode(type.value)}
-                      >
-                        <Barcode className="h-3 w-3 mr-2" />
-                        <span className="truncate">{type.label}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="shapes" className="border-none">
-              <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
-                Formas
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-auto py-3 flex-col gap-1"
-                    onClick={() => handleAddShape('rectangle')}
-                  >
-                    <Square className="h-5 w-5" />
-                    <span className="text-xs">Retângulo</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-auto py-3 flex-col gap-1"
-                    onClick={() => handleAddShape('circle')}
-                  >
-                    <Circle className="h-5 w-5" />
-                    <span className="text-xs">Círculo</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-auto py-3 flex-col gap-1"
-                    onClick={() => handleAddShape('line')}
-                  >
-                    <Minus className="h-5 w-5" />
-                    <span className="text-xs">Linha</span>
-                  </Button>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+    <TooltipProvider delayDuration={300}>
+      <aside className="w-16 border-r border-border bg-card flex flex-col items-center py-3 gap-2">
+        {/* Home Button */}
+        <div className="mb-2 pb-2 border-b border-border w-full flex justify-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-lg"
+                onClick={() => navigate('/')}
+              >
+                <Home className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Voltar para Home</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
-      </ScrollArea>
-    </aside>
+
+        {/* Text */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-12 w-12 rounded-lg"
+              onClick={handleAddText}
+            >
+              <Type className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>Adicionar Texto</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Dynamic Fields Dropdown */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-lg"
+                >
+                  <Hash className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Campos Dinâmicos</p>
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent side="right" align="start" className="w-56">
+            <DropdownMenuLabel>Campos Dinâmicos</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {DYNAMIC_FIELDS.map((field) => (
+              <DropdownMenuItem
+                key={field.value}
+                onClick={() => handleAddDynamicField(field.value, field.label)}
+                className="cursor-pointer"
+              >
+                <Hash className="h-4 w-4 mr-2" />
+                <div className="flex flex-col">
+                  <span className="font-medium">{field.label}</span>
+                  <span className="text-xs text-muted-foreground">{field.description}</span>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Image */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-12 w-12 rounded-lg"
+              onClick={handleAddImage}
+            >
+              <Image className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>Adicionar Imagem</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <div className="w-8 border-t border-border my-1" />
+
+        {/* Codes Dropdown */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-lg"
+                >
+                  <QrCode className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Códigos</p>
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent side="right" align="start" className="w-56">
+            <DropdownMenuLabel>Códigos 2D</DropdownMenuLabel>
+            <DropdownMenuItem onClick={handleAddQRCode} className="cursor-pointer">
+              <QrCode className="h-4 w-4 mr-2" />
+              QR Code
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddDataMatrix} className="cursor-pointer">
+              <Grid2X2 className="h-4 w-4 mr-2" />
+              DataMatrix
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddPDF417} className="cursor-pointer">
+              <FileText className="h-4 w-4 mr-2" />
+              PDF417
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Barcode className="h-4 w-4 mr-2" />
+                Códigos de Barras 1D
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56 max-h-96 overflow-y-auto">
+                {BARCODE_TYPES.map((type) => (
+                  <DropdownMenuItem
+                    key={type.value}
+                    onClick={() => handleAddBarcode(type.value, type.label)}
+                    className="cursor-pointer"
+                  >
+                    <Barcode className="h-4 w-4 mr-2" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{type.label}</span>
+                      <span className="text-xs text-muted-foreground">{type.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Shapes Dropdown */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-lg"
+                >
+                  <Shapes className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Formas</p>
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent side="right" align="start" className="w-48">
+            <DropdownMenuLabel>Formas</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleAddShape('rectangle', 'Retângulo')}
+              className="cursor-pointer"
+            >
+              <Square className="h-4 w-4 mr-2" />
+              Retângulo
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleAddShape('circle', 'Círculo')}
+              className="cursor-pointer"
+            >
+              <Circle className="h-4 w-4 mr-2" />
+              Círculo
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleAddShape('line', 'Linha')}
+              className="cursor-pointer"
+            >
+              <Minus className="h-4 w-4 mr-2" />
+              Linha
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+      </aside>
+    </TooltipProvider>
   );
 }
