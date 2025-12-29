@@ -33,6 +33,7 @@ export function LabelCanvas() {
     undo,
     redo,
     zoom,
+    setZoom,
     showGrid,
     snapToGrid,
     gridSize,
@@ -63,6 +64,9 @@ export function LabelCanvas() {
       stopContextMenu: true,
     });
 
+    // Configurar tecla de seleção múltipla
+    canvas.selectionKey = 'shiftKey';
+
     fabricRef.current = canvas;
     setIsInitialized(true);
 
@@ -72,6 +76,10 @@ export function LabelCanvas() {
 
       // Se Shift está pressionado e há um objeto sob o cursor
       if (pointer.shiftKey && e.target) {
+        // Prevenir comportamento padrão IMEDIATAMENTE
+        e.e.preventDefault();
+        e.e.stopPropagation();
+
         const clickedObject = e.target as ExtendedFabricObject;
 
         // Se não há data.id, não é um objeto editável
@@ -112,8 +120,6 @@ export function LabelCanvas() {
             }
 
             canvas.requestRenderAll();
-            e.e.preventDefault();
-            e.e.stopPropagation();
           } else {
             // É uma seleção única, criar ActiveSelection com os dois objetos
             if (activeSelection !== clickedObject) {
@@ -124,12 +130,13 @@ export function LabelCanvas() {
               );
               canvas.setActiveObject(newSelection);
               canvas.requestRenderAll();
-              e.e.preventDefault();
-              e.e.stopPropagation();
             }
           }
+        } else {
+          // Se não há seleção, selecionar o objeto clicado
+          canvas.setActiveObject(clickedObject);
+          canvas.requestRenderAll();
         }
-        // Se não há seleção, o comportamento padrão do Fabric.js vai selecionar o objeto
       }
     });
 
@@ -597,6 +604,40 @@ export function LabelCanvas() {
       fabricRef.current = null;
     };
   }, []);
+
+  // Controle de zoom via scroll do mouse (useEffect separado)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Prevenir o comportamento padrão do navegador (zoom da página)
+      e.preventDefault();
+
+      // Determinar a direção do scroll (negativo = scroll para cima = zoom in)
+      const delta = e.deltaY;
+      const zoomIncrement = 10; // Incremento de 10%
+
+      // Calcular novo zoom
+      let newZoom = zoom;
+      if (delta < 0) {
+        // Scroll para cima - Zoom In
+        newZoom = Math.min(500, zoom + zoomIncrement);
+      } else {
+        // Scroll para baixo - Zoom Out
+        newZoom = Math.max(10, zoom - zoomIncrement);
+      }
+
+      // Aplicar novo zoom
+      setZoom(newZoom);
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [zoom, setZoom]);
 
   // Update canvas size
   useEffect(() => {

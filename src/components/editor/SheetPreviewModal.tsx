@@ -375,12 +375,17 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
         }
     };
 
-    // Only render when modal opens
+    // Only render when modal opens or page changes
     useEffect(() => {
         if (open) {
-            renderSheet();
+            // Small delay to ensure canvas is mounted
+            const timer = setTimeout(() => {
+                renderSheet();
+            }, 50);
+
+            return () => clearTimeout(timer);
         }
-    }, [open, renderSheet]);
+    }, [open, previewPage, renderSheet]);
 
     // Clear cache when elements change
     useEffect(() => {

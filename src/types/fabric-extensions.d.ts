@@ -12,3 +12,12 @@ declare module 'bwip-js' {
     }
   ): Promise<HTMLCanvasElement>;
 }
+
+// Extensão para Fabric.js Canvas
+declare global {
+  namespace fabric {
+    interface Canvas {
+      selectionKey?: string | string[];
+    }
+  }
+}

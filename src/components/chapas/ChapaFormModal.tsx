@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useChapasStore, type Chapa } from '@/store/chapasStore';
 import {
   Dialog,
@@ -25,7 +25,7 @@ interface ChapaFormModalProps {
 
 export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormModalProps) {
   const { createChapa, updateChapa, getChapa, getChapaByName, chapas } = useChapasStore();
-  
+
   const [name, setName] = useState('');
   const [width, setWidth] = useState(210);
   const [height, setHeight] = useState(297);
@@ -88,7 +88,7 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
   // Validate form
   const validation = useMemo(() => {
     const errors: string[] = [];
-    
+
     if (!name.trim()) {
       errors.push('Nome é obrigatório');
     } else {
@@ -97,27 +97,27 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
         errors.push('Já existe uma chapa com este nome');
       }
     }
-    
+
     if (width <= 0) errors.push('Largura da chapa deve ser maior que 0');
     if (height <= 0) errors.push('Altura da chapa deve ser maior que 0');
     if (labelWidth <= 0) errors.push('Largura da etiqueta deve ser maior que 0');
     if (labelHeight <= 0) errors.push('Altura da etiqueta deve ser maior que 0');
     if (columns < 1) errors.push('Mínimo 1 coluna');
     if (rows < 1) errors.push('Mínimo 1 linha');
-    
+
     // Check if labels fit in the sheet
     const usableWidth = width - marginLeft - marginRight;
     const usableHeight = height - marginTop - marginBottom;
     const totalLabelWidth = columns * labelWidth + (columns - 1) * spacingHorizontal;
     const totalLabelHeight = rows * labelHeight + (rows - 1) * spacingVertical;
-    
+
     if (totalLabelWidth > usableWidth) {
       errors.push('Etiquetas excedem a largura disponível da chapa');
     }
     if (totalLabelHeight > usableHeight) {
       errors.push('Etiquetas excedem a altura disponível da chapa');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,
@@ -176,7 +176,7 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
             {mode === 'create' ? 'Nova Chapa' : 'Editar Chapa'}
           </DialogTitle>
           <DialogDescription>
-            {mode === 'create' 
+            {mode === 'create'
               ? 'Configure as dimensões da chapa e das etiquetas'
               : 'Altere as configurações da chapa. O.S existentes não serão afetadas.'
             }
@@ -321,7 +321,7 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
             <div className="mt-4 p-3 bg-muted/50 rounded-lg">
               <p className="text-xs text-muted-foreground mb-2">Pré-visualização</p>
               <div className="flex justify-center">
-                <div 
+                <div
                   className="bg-background border border-border relative"
                   style={{
                     width: Math.min(200, width * 0.6),
@@ -329,7 +329,7 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   }}
                 >
                   {/* Margens */}
-                  <div 
+                  <div
                     className="absolute bg-primary/5"
                     style={{
                       top: `${(marginTop / height) * 100}%`,
@@ -339,7 +339,7 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                     }}
                   >
                     {/* Grid de etiquetas */}
-                    <div 
+                    <div
                       className="w-full h-full grid"
                       style={{
                         gridTemplateColumns: `repeat(${columns}, 1fr)`,
@@ -349,8 +349,8 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                       }}
                     >
                       {Array.from({ length: Math.min(columns * rows, 100) }).map((_, i) => (
-                        <div 
-                          key={i} 
+                        <div
+                          key={i}
                           className="bg-primary/20 border border-primary/40 rounded-[1px]"
                         />
                       ))}
