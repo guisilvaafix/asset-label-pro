@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Editor from "./pages/Editor";
 import Chapas from "./pages/Chapas";
+import Clients from "./pages/Clients";
 import NotFound from "./pages/NotFound";
 import { ErrorBoundary } from "./components/ui/error-boundary";
 
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Home />} />
             <Route path="/editor/:osId" element={<Editor />} />
             <Route path="/chapas" element={<Chapas />} />
+            <Route path="/clients" element={<Clients />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

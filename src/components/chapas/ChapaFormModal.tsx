@@ -319,47 +319,94 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
 
             {/* Preview da Chapa */}
             <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-2">Pré-visualização</p>
+              <p className="text-xs text-muted-foreground mb-2">Pré-visualização em escala</p>
               <div className="flex justify-center">
-                <div
-                  className="bg-background border border-border relative"
-                  style={{
-                    width: Math.min(200, width * 0.6),
-                    height: Math.min(280, height * 0.6),
-                  }}
-                >
-                  {/* Margens */}
-                  <div
-                    className="absolute bg-primary/5"
-                    style={{
-                      top: `${(marginTop / height) * 100}%`,
-                      left: `${(marginLeft / width) * 100}%`,
-                      right: `${(marginRight / width) * 100}%`,
-                      bottom: `${(marginBottom / height) * 100}%`,
-                    }}
-                  >
-                    {/* Grid de etiquetas */}
+                {(() => {
+                  // Calcular escala proporcional
+                  const maxPreviewWidth = 400;
+                  const maxPreviewHeight = 500;
+                  const scaleX = maxPreviewWidth / width;
+                  const scaleY = maxPreviewHeight / height;
+                  const scale = Math.min(scaleX, scaleY, 1.2); // Permitir até 120% para chapas pequenas
+
+                  // Dimensões do preview
+                  const previewWidth = width * scale;
+                  const previewHeight = height * scale;
+
+                  // Dimensões de cada etiqueta no preview
+                  const previewLabelWidth = labelWidth * scale;
+                  const previewLabelHeight = labelHeight * scale;
+
+                  // Margens no preview
+                  const previewMarginTop = marginTop * scale;
+                  const previewMarginBottom = marginBottom * scale;
+                  const previewMarginLeft = marginLeft * scale;
+                  const previewMarginRight = marginRight * scale;
+
+                  // Espaçamentos no preview
+                  const previewSpacingH = spacingHorizontal * scale;
+                  const previewSpacingV = spacingVertical * scale;
+
+                  return (
                     <div
-                      className="w-full h-full grid"
+                      className="bg-white dark:bg-gray-900 border-2 border-border relative shadow-sm"
                       style={{
-                        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                        gridTemplateRows: `repeat(${rows}, 1fr)`,
-                        gap: `${Math.max(1, spacingVertical * 0.3)}px ${Math.max(1, spacingHorizontal * 0.3)}px`,
-                        padding: '2px',
+                        width: `${previewWidth}px`,
+                        height: `${previewHeight}px`,
                       }}
                     >
-                      {Array.from({ length: Math.min(columns * rows, 100) }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="bg-primary/20 border border-primary/40 rounded-[1px]"
-                        />
-                      ))}
+                      {/* Área de margens (fundo) */}
+                      <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800/50" />
+
+                      {/* Área útil (onde ficam as etiquetas) */}
+                      <div
+                        className="absolute bg-primary/5"
+                        style={{
+                          top: `${previewMarginTop}px`,
+                          left: `${previewMarginLeft}px`,
+                          right: `${previewMarginRight}px`,
+                          bottom: `${previewMarginBottom}px`,
+                        }}
+                      />
+
+                      {/* Etiquetas com dimensões reais proporcionais */}
+                      {Array.from({ length: rows }).map((_, row) =>
+                        Array.from({ length: columns }).map((_, col) => {
+                          const x = previewMarginLeft + col * (previewLabelWidth + previewSpacingH);
+                          const y = previewMarginTop + row * (previewLabelHeight + previewSpacingV);
+
+                          return (
+                            <div
+                              key={`${row}-${col}`}
+                              className="absolute bg-primary/20 border border-primary/40 rounded-[1px] transition-all duration-150"
+                              style={{
+                                left: `${x}px`,
+                                top: `${y}px`,
+                                width: `${previewLabelWidth}px`,
+                                height: `${previewLabelHeight}px`,
+                              }}
+                            />
+                          );
+                        })
+                      )}
+
+                      {/* Indicadores de dimensões */}
+                      <div className="absolute -bottom-5 left-0 right-0 text-center">
+                        <span className="text-[10px] text-muted-foreground bg-background px-1 rounded">
+                          {width}mm
+                        </span>
+                      </div>
+                      <div className="absolute -right-8 top-0 bottom-0 flex items-center">
+                        <span className="text-[10px] text-muted-foreground bg-background px-1 rounded rotate-90">
+                          {height}mm
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                {width}×{height}mm • {columns}×{rows} = {totalLabels} etiquetas
+              <p className="text-xs text-center text-muted-foreground mt-6">
+                Etiqueta: {labelWidth}×{labelHeight}mm • Layout: {columns}×{rows} = {totalLabels} etiquetas
               </p>
             </div>
           </div>

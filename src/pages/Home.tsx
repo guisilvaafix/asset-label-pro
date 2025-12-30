@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, FileText, Calendar, Trash2, Search, Filter, MoreVertical, Layers } from 'lucide-react';
+import { Plus, FileText, Calendar, Trash2, Search, Filter, MoreVertical, Layers, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -105,15 +105,23 @@ export default function Home() {
               </div>
               <span className="font-bold text-lg">FinalPrint</span>
             </div>
-            <Button asChild variant="outline" className="gap-2">
-              <Link to="/chapas">
-                <Layers className="h-4 w-4" />
-                Gerenciar Chapas
-                {chapas.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">{chapas.length}</Badge>
-                )}
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" className="gap-2">
+                <Link to="/clients">
+                  <Users className="h-4 w-4" />
+                  Clientes
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="gap-2">
+                <Link to="/chapas">
+                  <Layers className="h-4 w-4" />
+                  Gerenciar Chapas
+                  {chapas.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">{chapas.length}</Badge>
+                  )}
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
