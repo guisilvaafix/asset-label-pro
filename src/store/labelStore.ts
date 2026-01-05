@@ -450,10 +450,13 @@ export const useLabelStore = create<LabelState>()(
         const state = get();
         const template = state.templates.find((t) => t.id === id);
         if (template) {
+          // Carregar apenas os elementos, preservando a configuração da chapa atual
+          // Isso é importante porque a O.S pode ter configurações bloqueadas
           set({
-            sheetConfig: template.sheetConfig,
-            elements: template.elements,
+            elements: JSON.parse(JSON.stringify(template.elements)), // Deep copy
             currentTemplateId: id,
+            history: [JSON.parse(JSON.stringify(template.elements))],
+            historyIndex: 0,
           });
         }
       },
@@ -471,7 +474,7 @@ export const useLabelStore = create<LabelState>()(
       // Canvas state
       zoom: 100,
       setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),
-      showGrid: true,
+      showGrid: false,
       setShowGrid: (show) => set({ showGrid: show }),
       snapToGrid: true,
       setSnapToGrid: (snap) => set({ snapToGrid: snap }),

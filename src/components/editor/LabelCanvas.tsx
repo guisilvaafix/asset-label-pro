@@ -14,7 +14,12 @@ interface ExtendedFabricObject extends FabricObject {
   data?: { id: string;[key: string]: unknown };
 }
 
-export function LabelCanvas() {
+interface LabelCanvasProps {
+  showHints?: boolean;
+  onCloseHints?: () => void;
+}
+
+export function LabelCanvas({ showHints, onCloseHints }: LabelCanvasProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,18 +69,20 @@ export function LabelCanvas() {
       stopContextMenu: true,
     });
 
-    // Configurar tecla de seleção múltipla
+    // Configurar tecla de seleção múltipla (Shift ou Ctrl)
     canvas.selectionKey = 'shiftKey';
 
     fabricRef.current = canvas;
     setIsInitialized(true);
 
-    // Handler para seleção múltipla com Shift+Click
+    // Handler para seleção múltipla com Shift+Click ou Ctrl+Click
     canvas.on('mouse:down', (e) => {
       const pointer = e.e as MouseEvent;
 
-      // Se Shift está pressionado e há um objeto sob o cursor
-      if (pointer.shiftKey && e.target) {
+      // Se Shift ou Ctrl está pressionado e há um objeto sob o cursor
+      const isMultiSelectKey = pointer.shiftKey || pointer.ctrlKey || pointer.metaKey;
+
+      if (isMultiSelectKey && e.target) {
         // Prevenir comportamento padrão IMEDIATAMENTE
         e.e.preventDefault();
         e.e.stopPropagation();
@@ -977,6 +984,13 @@ export function LabelCanvas() {
     }
   }, [elements, renderElements]);
 
+  // Re-render when grid settings change
+  useEffect(() => {
+    if (isInitialized) {
+      renderElements();
+    }
+  }, [showGrid, gridSize, isInitialized, renderElements]);
+
   // Handle selection from store
   useEffect(() => {
     if (!fabricRef.current) return;
@@ -1003,7 +1017,9 @@ export function LabelCanvas() {
       className="flex-1 overflow-auto bg-muted/30 flex items-center justify-center p-8 relative"
     >
       {/* Show hints when canvas is empty */}
-      {elements.length === 0 && <CanvasHints />}
+      {elements.length === 0 && <CanvasHints show={showHints} onClose={onCloseHints} />}
+      {/* Show hints when button is clicked */}
+      {showHints && elements.length > 0 && <CanvasHints show={showHints} onClose={onCloseHints} />}
 
       <div
         style={{

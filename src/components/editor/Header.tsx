@@ -4,9 +4,9 @@ import {
   FileDown,
   Settings,
   Grid3X3,
-  Magnet,
   FileText,
-  File
+  File,
+  HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,16 +26,15 @@ interface HeaderProps {
   onSaveTemplate: () => void;
   onLoadTemplate: () => void;
   onGenerateLayout: () => void;
+  onShowHints: () => void;
   isSaving?: boolean;
   lastSaved?: Date | null;
 }
 
-export function Header({ onExport, onSaveTemplate, onLoadTemplate, onGenerateLayout, isSaving, lastSaved }: HeaderProps) {
+export function Header({ onExport, onSaveTemplate, onLoadTemplate, onGenerateLayout, onShowHints, isSaving, lastSaved }: HeaderProps) {
   const {
     showGrid,
     setShowGrid,
-    snapToGrid,
-    setSnapToGrid,
     resetToDefault
   } = useLabelStore();
 
@@ -96,14 +95,16 @@ export function Header({ onExport, onSaveTemplate, onLoadTemplate, onGenerateLay
           >
             <Grid3X3 className="h-4 w-4" />
           </Toggle>
-          <Toggle
-            pressed={snapToGrid}
-            onPressedChange={setSnapToGrid}
+
+          <Button
+            variant="ghost"
             size="sm"
-            aria-label="Snap to grid"
+            onClick={onShowHints}
+            aria-label="Mostrar dicas"
+            className="h-8 w-8 p-0"
           >
-            <Magnet className="h-4 w-4" />
-          </Toggle>
+            <HelpCircle className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="h-6 w-px bg-border" />

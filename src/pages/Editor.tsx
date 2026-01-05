@@ -8,6 +8,8 @@ import { LabelCanvas } from '@/components/editor/LabelCanvas';
 import { SheetPreviewModal } from '@/components/editor/SheetPreviewModal';
 import { ExportDialog } from '@/components/editor/ExportDialog';
 import { GenerateLayoutModal } from '@/components/editor/GenerateLayoutModal';
+import { SaveTemplateModal } from '@/components/editor/SaveTemplateModal';
+import { LoadTemplateModal } from '@/components/editor/LoadTemplateModal';
 import { LayersPanel } from '@/components/editor/LayersPanel';
 import { AlignmentPanel } from '@/components/editor/AlignmentPanel';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
@@ -31,6 +33,9 @@ const Editor = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [generateLayoutOpen, setGenerateLayoutOpen] = useState(false);
   const [sheetPreviewOpen, setSheetPreviewOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [loadTemplateOpen, setLoadTemplateOpen] = useState(false);
+  const [showHints, setShowHints] = useState(false);
   const [activeTab, setActiveTab] = useState('props');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -140,9 +145,10 @@ const Editor = () => {
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header
         onExport={() => setExportDialogOpen(true)}
-        onSaveTemplate={() => { }}
-        onLoadTemplate={() => { }}
+        onSaveTemplate={() => setSaveTemplateOpen(true)}
+        onLoadTemplate={() => setLoadTemplateOpen(true)}
         onGenerateLayout={() => setGenerateLayoutOpen(true)}
+        onShowHints={() => setShowHints(true)}
         isSaving={isSaving}
         lastSaved={lastSaved}
       />
@@ -169,7 +175,7 @@ const Editor = () => {
                 Preview da Chapa
               </Button>
             </div>
-            <LabelCanvas />
+            <LabelCanvas showHints={showHints} onCloseHints={() => setShowHints(false)} />
 
             {/* Selection Info - Positioned relative to canvas */}
             <SelectionInfo />
@@ -280,6 +286,8 @@ const Editor = () => {
 
       <SheetPreviewModal open={sheetPreviewOpen} onOpenChange={setSheetPreviewOpen} />
       <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} />
+      <SaveTemplateModal open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} />
+      <LoadTemplateModal open={loadTemplateOpen} onOpenChange={setLoadTemplateOpen} />
       {osId && (
         <GenerateLayoutModal
           open={generateLayoutOpen}
