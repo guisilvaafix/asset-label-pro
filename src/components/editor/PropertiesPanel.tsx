@@ -25,6 +25,7 @@ import { Toggle } from '@/components/ui/toggle';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLabelStore } from '@/store/labelStore';
 import { BARCODE_TYPES, DYNAMIC_FIELDS, SequentialConfig } from '@/types/label';
+import { DynamicFieldConfig } from './DynamicFieldConfig';
 
 const FONT_FAMILIES = [
   'Arial',
@@ -46,7 +47,9 @@ export function PropertiesPanel() {
     duplicateElement,
     moveElementLayer,
     sequentialConfig,
-    csvHeaders
+    csvHeaders, // Deprecated, mantido para retrocompatibilidade
+    csvImports,
+    getCsvImport
   } = useLabelStore();
 
   // Usar useMemo para estabilizar a referência do selectedElement
@@ -324,18 +327,21 @@ export function PropertiesPanel() {
           {selectedElement.type === 'text' && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Texto</h3>
-              <div>
-                <Label className="text-xs">Conteúdo</Label>
-                <Input
-                  value={(localValues.text ?? selectedElement.text) || ''}
-                  onChange={(e) => updateWithDebounce('text', e.target.value, (val) => update({ text: val }))}
-                  onBlur={(e) => {
-                    if (updateTimeoutRef.current.text) clearTimeout(updateTimeoutRef.current.text);
-                    update({ text: e.target.value });
-                  }}
-                  className="h-8"
-                />
-              </div>
+              {/* Conteúdo - só mostrar se NÃO for dinâmico */}
+              {!selectedElement.isDynamic && (
+                <div>
+                  <Label className="text-xs">Conteúdo</Label>
+                  <Input
+                    value={(localValues.text ?? selectedElement.text) || ''}
+                    onChange={(e) => updateWithDebounce('text', e.target.value, (val) => update({ text: val }))}
+                    onBlur={(e) => {
+                      if (updateTimeoutRef.current.text) clearTimeout(updateTimeoutRef.current.text);
+                      update({ text: e.target.value });
+                    }}
+                    className="h-8"
+                  />
+                </div>
+              )}
               <div>
                 <Label className="text-xs">Fonte</Label>
                 <Select
@@ -422,13 +428,14 @@ export function PropertiesPanel() {
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Campo Dinâmico</Label>
-                <Switch
-                  checked={selectedElement.isDynamic || false}
-                  onCheckedChange={(checked) => update({ isDynamic: checked })}
-                />
-              </div>
+              <DynamicFieldConfig
+                element={selectedElement}
+                allElements={elements}
+                csvImports={csvImports}
+                sequentialConfig={sequentialConfig}
+                getCsvImport={getCsvImport}
+                onUpdate={update}
+              />
             </div>
           )}
 

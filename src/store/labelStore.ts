@@ -7,7 +7,8 @@ import {
   SequentialConfig,
   DataRow,
   ExportConfig,
-  PAPER_SIZES
+  PAPER_SIZES,
+  CSVImport
 } from '@/types/label';
 import { labelElementSchema, sheetConfigSchema, sequentialConfigSchema } from '@/schemas/labelSchemas';
 import { validateData } from '@/utils/validation';
@@ -40,6 +41,15 @@ interface LabelState {
   setDataMode: (mode: 'sequential' | 'csv') => void;
   sequentialConfig: SequentialConfig;
   setSequentialConfig: (config: Partial<SequentialConfig>) => void;
+
+  // CSV Imports (múltiplas planilhas)
+  csvImports: CSVImport[];
+  addCsvImport: (csvImport: CSVImport) => void;
+  removeCsvImport: (id: string) => void;
+  getCsvImport: (id: string) => CSVImport | undefined;
+  getAllCsvHeaders: () => { importId: string; importName: string; header: string }[];
+
+  // Deprecated - mantido para retrocompatibilidade
   csvData: DataRow[];
   csvHeaders: string[];
   setCsvData: (data: DataRow[], headers: string[]) => void;
@@ -424,9 +434,59 @@ export const useLabelStore = create<LabelState>()(
 
         set({ sequentialConfig: validation.data! as SequentialConfig });
       },
+
+      // CSV Imports (múltiplas planilhas)
+      csvImports: [],
+
+      addCsvImport: (csvImport) => set((state) => ({
+        csvImports: [...state.csvImports, csvImport],
+      })),
+
+      removeCsvImport: (id) => set((state) => ({
+        csvImports: state.csvImports.filter(csv => csv.id !== id),
+      })),
+
+      getCsvImport: (id) => {
+        return get().csvImports.find(csv => csv.id === id);
+      },
+
+      getAllCsvHeaders: () => {
+        const state = get();
+        const headers: { importId: string; importName: string; header: string }[] = [];
+
+        state.csvImports.forEach(csvImport => {
+          csvImport.headers.forEach(header => {
+            headers.push({
+              importId: csvImport.id,
+              importName: csvImport.name,
+              header: header,
+            });
+          });
+        });
+
+        return headers;
+      },
+
+      // Deprecated - mantido para retrocompatibilidade
       csvData: [],
       csvHeaders: [],
-      setCsvData: (data, headers) => set({ csvData: data, csvHeaders: headers }),
+      setCsvData: (data, headers) => {
+        // Converter para novo formato automaticamente
+        const legacyCsvImport: CSVImport = {
+          id: 'legacy-csv-' + Date.now(),
+          name: 'Planilha Importada',
+          fileName: 'dados.csv',
+          headers: headers,
+          data: data,
+          importedAt: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          csvData: data,
+          csvHeaders: headers,
+          csvImports: [...state.csvImports, legacyCsvImport],
+        }));
+      },
 
       // Templates
       templates: [],
@@ -505,6 +565,7 @@ export const useLabelStore = create<LabelState>()(
         sequentialConfig: defaultSequentialConfig,
         csvData: [],
         csvHeaders: [],
+        csvImports: [],
         dataMode: 'sequential',
         zoom: 100,
         previewPage: 1,

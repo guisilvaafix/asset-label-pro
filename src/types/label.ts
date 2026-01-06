@@ -62,7 +62,11 @@ export interface LabelElement {
     suffix: string;
   };
   // CSV column name (when dataSourceType is 'csv')
-  csvColumn?: string;
+  csvImportId?: string;         // ID da planilha CSV (para múltiplos CSVs)
+  csvColumn?: string;           // Nome da coluna
+  // Sequential reference (when dataSourceType is 'sequential' for text elements)
+  sequentialReference?: string; // ID do elemento QR/Barcode de referência
+  sequentialFormat?: string;    // Formato do valor: {NUMERO}, {PREFIXO}{NUMERO}, etc.
   // Shape properties
   shapeFill?: string;
   shapeStroke?: string;
@@ -73,7 +77,7 @@ export interface LabelElement {
   dynamicField?: string;
 }
 
-export type BarcodeType = 
+export type BarcodeType =
   | 'CODE128'
   | 'CODE128A'
   | 'CODE128B'
@@ -95,6 +99,15 @@ export type BarcodeType =
 
 export interface DataRow {
   [key: string]: string;
+}
+
+export interface CSVImport {
+  id: string;                    // UUID único da planilha
+  name: string;                  // Nome amigável da planilha
+  fileName: string;              // Nome original do arquivo
+  headers: string[];             // Colunas da planilha
+  data: DataRow[];              // Dados da planilha
+  importedAt: string;           // Data/hora de importação
 }
 
 export interface SequentialConfig {
