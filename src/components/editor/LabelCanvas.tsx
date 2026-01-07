@@ -712,7 +712,25 @@ export function LabelCanvas({ showHints, onCloseHints }: LabelCanvasProps = {}) 
         case 'text': {
           let text = element.text || '';
           if (element.isDynamic) {
-            text = replaceDynamicFields(text, sampleData);
+            // Resolver referência para dados sequenciais
+            let dataElement = element;
+            if (element.sequentialReference) {
+              const refElement = elements.find(el => el.id === element.sequentialReference);
+              if (refElement) {
+                dataElement = refElement;
+              }
+            }
+
+            // Gerar dados com base no elemento correto (próprio ou referência)
+            // Se for referência, o generateElementSequenceData vai pegar o customSequence dela
+            // Se não for, vai pegar do próprio elemento ou cair no fallback global (se implementado assim no generator)
+            // Nota: O generateElementSequenceData precisa do sequentialConfig para fallback
+            const elementData = generateElementSequenceData(dataElement, 0, sequentialConfig);
+
+            text = replaceDynamicFields(text, {
+              ...elementData,
+              custom: {},
+            });
           }
 
           const textObj = new IText(text, {

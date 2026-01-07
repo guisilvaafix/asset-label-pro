@@ -17,8 +17,8 @@ export function generateElementSequenceData(
   defaultSequence: SequentialConfig,
   csvRow?: DataRow // Linha do CSV quando dataSourceType é 'csv'
 ): SequenceData {
-  // Se o elemento usa sequência personalizada
-  if (element.dataSourceType === 'sequential' && element.customSequence) {
+  // Se o elemento tem sequência personalizada, usa ela (independente do dataSourceType)
+  if (element.customSequence) {
     const customSeq = element.customSequence;
     const num = customSeq.start + labelIndex * customSeq.step;
     return {
@@ -27,7 +27,18 @@ export function generateElementSequenceData(
       sufixo: customSeq.suffix,
     };
   }
-  
+
+  // Se o elemento está explicitamente configurado como sequential mas sem customSequence
+  // (usa a sequência global/default)
+  if (element.dataSourceType === 'sequential') {
+    const num = defaultSequence.start + labelIndex * defaultSequence.step;
+    return {
+      numero: num.toString().padStart(defaultSequence.padLength, '0'),
+      prefixo: defaultSequence.prefix,
+      sufixo: defaultSequence.suffix,
+    };
+  }
+
   // Se o elemento usa CSV
   if (element.dataSourceType === 'csv' && csvRow && element.csvColumn) {
     return {
@@ -37,7 +48,7 @@ export function generateElementSequenceData(
       csvValue: csvRow[element.csvColumn] || '',
     };
   }
-  
+
   // Se o elemento usa valor fixo ou não tem configuração, retorna valores padrão
   // (o valor fixo será usado diretamente no campo qrValue/barcodeValue)
   return {
@@ -57,35 +68,35 @@ export function getElementValue(
   csvRow?: DataRow
 ): string {
   const baseValue = element.type === 'qrcode' ? element.qrValue : element.barcodeValue;
-  
+
   if (!baseValue) return '';
-  
+
   // Se for valor fixo, retorna direto
   if (element.dataSourceType === 'fixed' || !element.dataSourceType) {
     return baseValue;
   }
-  
+
   // Gera dados de sequência
   const seqData = generateElementSequenceData(element, labelIndex, defaultSequence, csvRow);
-  
+
   // Substitui campos dinâmicos
   let result = baseValue;
   result = result.replace(/{NUMERO}/g, seqData.numero);
   result = result.replace(/{PREFIXO}/g, seqData.prefixo);
   result = result.replace(/{SUFIXO}/g, seqData.sufixo);
-  
+
   // Se for CSV, substitui a coluna específica
   if (element.dataSourceType === 'csv' && element.csvColumn && csvRow) {
     result = result.replace(new RegExp(`\\{${element.csvColumn}\\}`, 'g'), csvRow[element.csvColumn] || '');
   }
-  
+
   // Substitui outras colunas do CSV se existirem
   if (csvRow) {
     Object.keys(csvRow).forEach((key) => {
       result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), csvRow[key] || '');
     });
   }
-  
+
   return result;
 }
 

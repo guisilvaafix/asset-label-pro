@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { useLabelStore } from '@/store/labelStore';
 import { PAPER_SIZES, LabelElement } from '@/types/label';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
+import { generateElementSequenceData } from '@/utils/sequenceGenerator';
 
 const MM_TO_PX = 4; // Higher quality scale for preview
 
@@ -183,7 +184,7 @@ export function SheetPreview() {
         await renderLabelElements(ctx, labelX, labelY, labelIndex);
       }
     }
-  }, [paper, sheetConfig, elements, previewPage, labelsPerPage, totalLabels]);
+  }, [paper, sheetConfig, elements, previewPage, labelsPerPage, totalLabels, sequentialConfig]);
 
   // Render elements within a single label
   const renderLabelElements = async (
@@ -213,21 +214,50 @@ export function SheetPreview() {
 
       switch (element.type) {
         case 'text': {
-          const sequenceData = element.customSequence
-            ? {
-              numero: (element.customSequence.start + labelIndex * element.customSequence.step).toString().padStart(element.customSequence.padLength, '0'),
-              prefixo: element.customSequence.prefix,
-              sufixo: element.customSequence.suffix,
-            }
-            : null;
+          let text = element.text || 'Texto';
 
-          const textData = sequenceData || labelData;
-          const text = replaceDynamicFields(element.text || 'Texto', {
-            numero: textData.numero,
-            prefixo: textData.prefixo,
-            sufixo: textData.sufixo,
-            custom: ('custom' in textData ? textData.custom : undefined) || {},
-          });
+          if (element.isDynamic) {
+            let targetElement = element;
+            if (element.sequentialReference) {
+              const refElement = elements.find(el => el.id === element.sequentialReference);
+              if (refElement) {
+                targetElement = refElement;
+              }
+            }
+
+            // Tenta gerar dados específicos do elemento (ou da referência)
+            const generatedData = generateElementSequenceData(targetElement, labelIndex, sequentialConfig);
+
+            // DEBUG
+            if (labelIndex === 0 && element.sequentialReference) {
+              console.log('SheetPreview DEBUG:', {
+                elementText: element.text,
+                hasReference: !!element.sequentialReference,
+                targetElementId: targetElement.id,
+                targetElementType: targetElement.type,
+                hasCustomSequence: !!targetElement.customSequence,
+                customSequence: targetElement.customSequence,
+                generatedData,
+                labelData
+              });
+            }
+
+            let textData: any = labelData;
+
+            if (element.sequentialReference || targetElement.customSequence) {
+              textData = {
+                ...generatedData,
+                custom: ('custom' in labelData ? labelData.custom : undefined) || {},
+              };
+            }
+
+            text = replaceDynamicFields(element.text || 'Texto', {
+              numero: textData.numero,
+              prefixo: textData.prefixo,
+              sufixo: textData.sufixo,
+              custom: textData.custom || {},
+            });
+          }
 
           ctx.fillStyle = element.fill || '#000000';
           const fontSize = (element.fontSize || 12) * (MM_TO_PX / 3.78);

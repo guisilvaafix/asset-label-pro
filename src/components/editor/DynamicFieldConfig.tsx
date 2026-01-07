@@ -16,8 +16,8 @@ interface DynamicFieldConfigProps {
 // Opções de formato de valor
 const VALUE_FORMAT_OPTIONS = [
     { value: '{NUMERO}', label: 'Número', example: '000001' },
-    { value: '{PREFIXO}{NUMERO}', label: 'Prefixo + Número', example: 'QR-000001' },
-    { value: '{PREFIXO}{NUMERO}{SUFIXO}', label: 'Prefixo + Número + Sufixo', example: 'QR-000001-A' },
+    { value: '{PREFIXO}{NUMERO}', label: 'Prefixo + Número', example: 'PAT-000001' },
+    { value: '{PREFIXO}{NUMERO}{SUFIXO}', label: 'Prefixo + Número + Sufixo', example: 'PAT-000001-A' },
     { value: '{NUMERO}{SUFIXO}', label: 'Número + Sufixo', example: '000001-A' },
 ];
 
@@ -209,13 +209,24 @@ export function DynamicFieldConfig({
                             )}
 
                             {/* Preview do valor */}
-                            {element.sequentialReference && element.customSequence && (
+                            {element.sequentialReference && (
                                 <div className="pt-2 border-t">
                                     <Label className="text-xs text-muted-foreground">Preview:</Label>
                                     <p className="text-xs font-mono mt-1 p-2 bg-background rounded">
                                         {(() => {
                                             const format = element.sequentialFormat || '{NUMERO}';
-                                            const seq = element.customSequence;
+
+                                            // Buscar dados da referência (Live Link)
+                                            let seq = element.customSequence;
+                                            if (element.sequentialReference) {
+                                                const refElement = allElements.find(el => el.id === element.sequentialReference);
+                                                if (refElement?.customSequence) {
+                                                    seq = refElement.customSequence;
+                                                }
+                                            }
+
+                                            if (!seq) return '—';
+
                                             const numero = seq.start.toString().padStart(seq.padLength, '0');
                                             return format
                                                 .replace('{NUMERO}', numero)

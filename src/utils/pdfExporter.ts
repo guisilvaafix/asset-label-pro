@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { SheetConfig, LabelElement, ExportConfig, PAPER_SIZES, SequentialConfig } from '@/types/label';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from './barcodeGenerator';
-import { getElementValue } from './sequenceGenerator';
+import { getElementValue, generateElementSequenceData } from './sequenceGenerator';
 
 const MM_TO_PT = 2.83465; // millimeters to points conversion
 
@@ -67,7 +67,7 @@ export async function exportToPDF(
       // Draw each element
       const globalLabelIndex = pageIndex * labelsPerPage + labelIndex;
       for (const element of elements.sort((a, b) => a.zIndex - b.zIndex)) {
-        await drawElement(page, pdfDoc, element, labelX, labelY, data, font, fontBold, sheetConfig, globalLabelIndex, defaultSequence || {
+        await drawElement(page, pdfDoc, element, elements, labelX, labelY, data, font, fontBold, sheetConfig, globalLabelIndex, defaultSequence || {
           start: 1,
           end: 100,
           step: 1,
@@ -104,7 +104,7 @@ export async function exportToPDFSingle(
     const page = pdfDoc.addPage([labelWidth, labelHeight]);
 
     for (const element of elements.sort((a, b) => a.zIndex - b.zIndex)) {
-      await drawElement(page, pdfDoc, element, 0, 0, data, font, fontBold, sheetConfig, i, defaultSequence || {
+      await drawElement(page, pdfDoc, element, elements, 0, 0, data, font, fontBold, sheetConfig, i, defaultSequence || {
         start: 1,
         end: 100,
         step: 1,
@@ -177,6 +177,7 @@ async function drawElement(
   page: ReturnType<PDFDocument['addPage']>,
   pdfDoc: PDFDocument,
   element: LabelElement,
+  allElements: LabelElement[],
   labelX: number,
   labelY: number,
   data: LabelData,
@@ -197,7 +198,26 @@ async function drawElement(
     case 'text': {
       let text = element.text || '';
       if (element.isDynamic) {
-        text = replaceDynamicFields(text, data);
+        // Resolver referência para dados sequenciais
+        let elementData: any = data;
+
+        if (element.sequentialReference) {
+          let dataElement = element;
+          const refElement = allElements.find(el => el.id === element.sequentialReference);
+          if (refElement) {
+            dataElement = refElement;
+          }
+
+          // Gerar dados específicos para o elemento de referência
+          const seqData = generateElementSequenceData(dataElement, labelIndex, defaultSequence, csvRow);
+
+          elementData = {
+            ...seqData,
+            custom: data.custom || {}
+          };
+        }
+
+        text = replaceDynamicFields(text, elementData);
       }
 
       const selectedFont = element.fontWeight === 'bold' ? fontBold : font;
