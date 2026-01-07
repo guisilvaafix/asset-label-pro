@@ -224,11 +224,20 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
 
             switch (element.type) {
                 case 'text': {
-                    const sequenceData = element.customSequence
+                    // Resolver referência para dados sequenciais (Live Link)
+                    let targetElement = element;
+                    if (element.sequentialReference) {
+                        const refElement = elements.find(el => el.id === element.sequentialReference);
+                        if (refElement) {
+                            targetElement = refElement;
+                        }
+                    }
+
+                    const sequenceData = targetElement.customSequence
                         ? {
-                            numero: (element.customSequence.start + labelIndex * element.customSequence.step).toString().padStart(element.customSequence.padLength, '0'),
-                            prefixo: element.customSequence.prefix,
-                            sufixo: element.customSequence.suffix,
+                            numero: (targetElement.customSequence.start + labelIndex * targetElement.customSequence.step).toString().padStart(targetElement.customSequence.padLength, '0'),
+                            prefixo: targetElement.customSequence.prefix,
+                            sufixo: targetElement.customSequence.suffix,
                         }
                         : null;
 

@@ -216,7 +216,29 @@ export function SheetPreview() {
         case 'text': {
           let text = element.text || 'Texto';
 
+          // DEBUG - Ver TODOS os elementos de texto
+          if (labelIndex === 0) {
+            console.log('SheetPreview - Elemento:', {
+              type: element.type,
+              isDynamic: element.isDynamic,
+              text: element.text,
+              sequentialReference: element.sequentialReference
+            });
+          }
+
           if (element.isDynamic) {
+            // DEBUG - Ver dados do elemento
+            if (labelIndex === 0 && element.type === 'text') {
+              console.log('SheetPreview - Elemento de Texto:', {
+                elementId: element.id,
+                text: element.text,
+                isDynamic: element.isDynamic,
+                sequentialReference: element.sequentialReference,
+                customSequence: element.customSequence,
+                dataSourceType: element.dataSourceType
+              });
+            }
+
             let targetElement = element;
             if (element.sequentialReference) {
               const refElement = elements.find(el => el.id === element.sequentialReference);
