@@ -12,7 +12,7 @@ import { useLabelStore } from '@/store/labelStore';
 import { PAPER_SIZES, LabelElement } from '@/types/label';
 import { generateBarcode, generateQRCode, replaceDynamicFields } from '@/utils/barcodeGenerator';
 
-const MM_TO_PX = 4; // Higher quality scale for preview
+const MM_TO_PX = 3.78; // Match editor scale (96 DPI)
 
 interface SheetPreviewModalProps {
     open: boolean;
@@ -140,6 +140,7 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
 
     // Render the sheet preview
     const renderSheet = useCallback(async () => {
+        await document.fonts.ready;
         const canvas = canvasRef.current;
         if (!canvas) return;
 
@@ -250,8 +251,13 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
                     });
 
                     ctx.fillStyle = element.fill || '#000000';
-                    const fontSize = (element.fontSize || 12) * (MM_TO_PX / 3.78);
-                    ctx.font = `${element.fontStyle === 'italic' ? 'italic ' : ''}${element.fontWeight === 'bold' ? 'bold ' : ''}${fontSize}px ${element.fontFamily || 'Arial'}`;
+                    const fontSize = element.fontSize || 12;
+
+                    const fontStyle = element.fontStyle === 'italic' ? 'italic' : 'normal';
+                    const fontWeight = element.fontWeight === 'bold' ? 'bold' : 'normal';
+                    const fontFamily = element.fontFamily || 'Arial';
+
+                    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${fontFamily}"`;
                     ctx.textAlign = (element.textAlign as CanvasTextAlign) || 'left';
                     ctx.textBaseline = 'top';
 
@@ -330,7 +336,7 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
 
                     if (element.shapeStroke && element.shapeStrokeWidth) {
                         ctx.strokeStyle = element.shapeStroke;
-                        ctx.lineWidth = element.shapeStrokeWidth * MM_TO_PX / 3.78;
+                        ctx.lineWidth = element.shapeStrokeWidth;
                         if (element.cornerRadius && element.cornerRadius > 0) {
                             const radius = element.cornerRadius * MM_TO_PX;
                             ctx.beginPath();
@@ -363,7 +369,7 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
 
                     if (element.shapeStroke && element.shapeStrokeWidth) {
                         ctx.strokeStyle = element.shapeStroke;
-                        ctx.lineWidth = element.shapeStrokeWidth * MM_TO_PX / 3.78;
+                        ctx.lineWidth = element.shapeStrokeWidth;
                         ctx.stroke();
                     }
                     break;
@@ -374,7 +380,7 @@ export function SheetPreviewModal({ open, onOpenChange }: SheetPreviewModalProps
                     ctx.moveTo(elemX, elemY + elemHeight / 2);
                     ctx.lineTo(elemX + elemWidth, elemY + elemHeight / 2);
                     ctx.strokeStyle = element.shapeStroke || '#000000';
-                    ctx.lineWidth = (element.shapeStrokeWidth || 1) * MM_TO_PX / 3.78;
+                    ctx.lineWidth = (element.shapeStrokeWidth || 1);
                     ctx.stroke();
                     break;
                 }
