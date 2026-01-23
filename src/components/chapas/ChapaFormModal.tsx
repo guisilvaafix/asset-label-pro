@@ -85,6 +85,41 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
   // Calculate total labels
   const totalLabels = useMemo(() => columns * rows, [columns, rows]);
 
+  const recalculateLayout = (values: Partial<{
+    width: number;
+    height: number;
+    labelWidth: number;
+    labelHeight: number;
+    marginTop: number;
+    marginBottom: number;
+    marginLeft: number;
+    marginRight: number;
+    spacingHorizontal: number;
+    spacingVertical: number;
+  }>) => {
+    const w = values.width ?? width;
+    const h = values.height ?? height;
+    const lw = values.labelWidth ?? labelWidth;
+    const lh = values.labelHeight ?? labelHeight;
+    const mt = values.marginTop ?? marginTop;
+    const mb = values.marginBottom ?? marginBottom;
+    const ml = values.marginLeft ?? marginLeft;
+    const mr = values.marginRight ?? marginRight;
+    const sh = values.spacingHorizontal ?? spacingHorizontal;
+    const sv = values.spacingVertical ?? spacingVertical;
+
+    const usableWidth = w - ml - mr;
+    const usableHeight = h - mt - mb;
+
+    if (usableWidth <= 0 || usableHeight <= 0) return;
+
+    const maxCols = Math.floor((usableWidth + sh) / (lw + sh));
+    const maxRows = Math.floor((usableHeight + sv) / (lh + sv));
+
+    setColumns(Math.max(1, maxCols));
+    setRows(Math.max(1, maxRows));
+  };
+
   // Validate form
   const validation = useMemo(() => {
     const errors: string[] = [];
@@ -210,7 +245,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="1000"
                   step="0.1"
                   value={width}
-                  onChange={(e) => setWidth(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setWidth(val);
+                    recalculateLayout({ width: val });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -222,7 +261,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="1000"
                   step="0.1"
                   value={height}
-                  onChange={(e) => setHeight(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setHeight(val);
+                    recalculateLayout({ height: val });
+                  }}
                 />
               </div>
             </div>
@@ -243,7 +286,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="500"
                   step="0.1"
                   value={labelWidth}
-                  onChange={(e) => setLabelWidth(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setLabelWidth(val);
+                    recalculateLayout({ labelWidth: val });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -255,7 +302,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="500"
                   step="0.1"
                   value={labelHeight}
-                  onChange={(e) => setLabelHeight(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setLabelHeight(val);
+                    recalculateLayout({ labelHeight: val });
+                  }}
                 />
               </div>
             </div>
@@ -265,27 +316,7 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
 
           {/* Layout: Colunas e Linhas */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium">Layout da Chapa</h4>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const usableWidth = width - marginLeft - marginRight;
-                  const usableHeight = height - marginTop - marginBottom;
-                  const maxCols = Math.floor((usableWidth + spacingHorizontal) / (labelWidth + spacingHorizontal));
-                  const maxRows = Math.floor((usableHeight + spacingVertical) / (labelHeight + spacingVertical));
-                  setColumns(Math.max(1, maxCols));
-                  setRows(Math.max(1, maxRows));
-                  toast.success(`Layout calculado: ${Math.max(1, maxCols)} colunas × ${Math.max(1, maxRows)} linhas`);
-                }}
-                className="gap-1"
-              >
-                <Wand2 className="h-3 w-3" />
-                Auto
-              </Button>
-            </div>
+            <h4 className="text-sm font-medium mb-3">Layout da Chapa</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="columns">Colunas *</Label>
@@ -426,7 +457,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="100"
                   step="0.1"
                   value={marginTop}
-                  onChange={(e) => setMarginTop(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setMarginTop(val);
+                    recalculateLayout({ marginTop: val });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -438,7 +473,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="100"
                   step="0.1"
                   value={marginBottom}
-                  onChange={(e) => setMarginBottom(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setMarginBottom(val);
+                    recalculateLayout({ marginBottom: val });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -450,7 +489,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="100"
                   step="0.1"
                   value={marginLeft}
-                  onChange={(e) => setMarginLeft(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setMarginLeft(val);
+                    recalculateLayout({ marginLeft: val });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -462,7 +505,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="100"
                   step="0.1"
                   value={marginRight}
-                  onChange={(e) => setMarginRight(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setMarginRight(val);
+                    recalculateLayout({ marginRight: val });
+                  }}
                 />
               </div>
             </div>
@@ -481,7 +528,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="50"
                   step="0.1"
                   value={spacingHorizontal}
-                  onChange={(e) => setSpacingHorizontal(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setSpacingHorizontal(val);
+                    recalculateLayout({ spacingHorizontal: val });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -493,7 +544,11 @@ export function ChapaFormModal({ open, onOpenChange, mode, chapaId }: ChapaFormM
                   max="50"
                   step="0.1"
                   value={spacingVertical}
-                  onChange={(e) => setSpacingVertical(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setSpacingVertical(val);
+                    recalculateLayout({ spacingVertical: val });
+                  }}
                 />
               </div>
             </div>

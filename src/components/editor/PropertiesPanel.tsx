@@ -14,6 +14,7 @@ import {
   Italic
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useSelectedElement, useElementUpdate, useLocalValues } from '@/hooks/usePropertiesOptimization';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,7 +26,12 @@ import { Toggle } from '@/components/ui/toggle';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLabelStore } from '@/store/labelStore';
 import { BARCODE_TYPES, DYNAMIC_FIELDS, SequentialConfig } from '@/types/label';
+
 import { DynamicFieldConfig } from './DynamicFieldConfig';
+import { PositionProperties } from './properties/PositionProperties';
+import { StyleProperties } from './properties/StyleProperties';
+import { LayerProperties } from './properties/LayerProperties';
+import { ShapeProperties } from './properties/ShapeProperties';
 
 const FONT_FAMILIES = [
   'Arial',
@@ -39,84 +45,23 @@ const FONT_FAMILIES = [
 ];
 
 export function PropertiesPanel() {
-  const {
-    elements,
-    selectedElementId,
-    updateElement,
-    removeElement,
-    duplicateElement,
-    moveElementLayer,
-    sequentialConfig,
-    csvHeaders, // Deprecated, mantido para retrocompatibilidade
-    csvImports,
-    getCsvImport
-  } = useLabelStore();
+  // Optimized hooks to prevent re-renders
+  const selectedElementId = useLabelStore((state) => state.selectedElementId);
+  const selectedElement = useSelectedElement();
+  const update = useElementUpdate();
+  const { localValues, updateWithDebounce } = useLocalValues(selectedElementId);
 
-  // Usar useMemo para estabilizar a referência do selectedElement
-  const selectedElement = useMemo(
-    () => elements.find((el) => el.id === selectedElementId),
-    [elements, selectedElementId]
-  );
+  // Get store functions directly (stable references)
+  const removeElement = useLabelStore.getState().removeElement;
+  const duplicateElement = useLabelStore.getState().duplicateElement;
+  const moveElementLayer = useLabelStore.getState().moveElementLayer;
 
-  // Estado local para inputs (evita re-renderização e perda de foco)
-  const [localValues, setLocalValues] = useState<Record<string, string | number>>({});
-  const updateTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
-
-  // Sincronizar estado local quando o elemento muda (apenas quando o ID muda)
-  useEffect(() => {
-    if (selectedElement) {
-      setLocalValues({
-        x: selectedElement.x,
-        y: selectedElement.y,
-        width: selectedElement.width,
-        height: selectedElement.height,
-        text: selectedElement.text || '',
-        qrValue: selectedElement.qrValue || '',
-        barcodeValue: selectedElement.barcodeValue || '',
-        fill: selectedElement.fill || '#000000',
-        qrForeground: selectedElement.qrForeground || '#000000',
-        qrBackground: selectedElement.qrBackground || '#ffffff',
-        shapeFill: selectedElement.shapeFill || '#ffffff',
-        shapeStroke: selectedElement.shapeStroke || '#000000',
-        prefix: selectedElement.customSequence?.prefix || '',
-        suffix: selectedElement.customSequence?.suffix || '',
-      });
-    }
-  }, [selectedElementId]); // Usar selectedElementId ao invés de selectedElement?.id
-
-  // Limpar timeouts ao desmontar ou mudar elemento
-  useEffect(() => {
-    return () => {
-      Object.values(updateTimeoutRef.current).forEach(timeout => clearTimeout(timeout));
-    };
-  }, [selectedElementId]);
-
-  // Função para atualizar com debounce
-  const updateWithDebounce = useCallback((key: string, value: string | number, finalUpdate: (val: any) => void, delay: number = 300) => {
-    setLocalValues(prev => ({ ...prev, [key]: value }));
-
-    if (updateTimeoutRef.current[key]) {
-      clearTimeout(updateTimeoutRef.current[key]);
-    }
-
-    updateTimeoutRef.current[key] = setTimeout(() => {
-      finalUpdate(value);
-    }, delay);
-  }, []);
-
-  // Função para atualizar imediatamente (sem debounce)
-  const updateImmediate = useCallback((updates: Partial<typeof selectedElement>) => {
-    if (selectedElement) {
-      updateElement(selectedElement.id, updates);
-    }
-  }, [selectedElement, updateElement]);
-
-  // Função principal de update - DEVE estar antes do return condicional
-  const update = useCallback((updates: Partial<typeof selectedElement>) => {
-    if (selectedElement) {
-      updateElement(selectedElement.id, updates);
-    }
-  }, [selectedElement, updateElement]);
+  // Get data for child components (memoized)
+  const sequentialConfig = useLabelStore((state) => state.sequentialConfig);
+  const csvHeaders = useLabelStore((state) => state.csvHeaders);
+  const csvImports = useLabelStore((state) => state.csvImports);
+  const getCsvImport = useLabelStore((state) => state.getCsvImport);
+  const elements = useLabelStore((state) => state.elements);
 
   if (!selectedElement) {
     return (
@@ -174,152 +119,33 @@ export function PropertiesPanel() {
       <ScrollArea className="flex-1 overflow-auto">
         <div className="p-4 space-y-4">
           {/* Position & Size */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium">Posição e Tamanho (mm)</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">X</Label>
-                <Input
-                  type="number"
-                  value={localValues.x ?? selectedElement.x}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    updateWithDebounce('x', val, (v) => update({ x: v }), 150);
-                  }}
-                  onBlur={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    if (updateTimeoutRef.current.x) clearTimeout(updateTimeoutRef.current.x);
-                    update({ x: val });
-                  }}
-                  step={0.5}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Y</Label>
-                <Input
-                  type="number"
-                  value={localValues.y ?? selectedElement.y}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    updateWithDebounce('y', val, (v) => update({ y: v }), 150);
-                  }}
-                  onBlur={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    if (updateTimeoutRef.current.y) clearTimeout(updateTimeoutRef.current.y);
-                    update({ y: val });
-                  }}
-                  step={0.5}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Largura</Label>
-                <Input
-                  type="number"
-                  value={localValues.width ?? selectedElement.width}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 1;
-                    updateWithDebounce('width', val, (v) => update({ width: v }), 150);
-                  }}
-                  onBlur={(e) => {
-                    const val = parseFloat(e.target.value) || 1;
-                    if (updateTimeoutRef.current.width) clearTimeout(updateTimeoutRef.current.width);
-                    update({ width: val });
-                  }}
-                  step={0.5}
-                  min={1}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Altura</Label>
-                <Input
-                  type="number"
-                  value={localValues.height ?? selectedElement.height}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 1;
-                    updateWithDebounce('height', val, (v) => update({ height: v }), 150);
-                  }}
-                  onBlur={(e) => {
-                    const val = parseFloat(e.target.value) || 1;
-                    if (updateTimeoutRef.current.height) clearTimeout(updateTimeoutRef.current.height);
-                    update({ height: val });
-                  }}
-                  step={0.5}
-                  min={1}
-                  className="h-8"
-                />
-              </div>
-            </div>
-          </div>
+          {/* Position & Size */}
+          <PositionProperties
+            elementId={selectedElement.id}
+            x={selectedElement.x}
+            y={selectedElement.y}
+            width={selectedElement.width}
+            height={selectedElement.height}
+            onUpdate={update}
+          />
 
           <Separator />
 
           {/* Rotation & Opacity */}
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Rotação: {selectedElement.rotation}°</Label>
-              <Slider
-                value={[selectedElement.rotation]}
-                onValueChange={([value]) => update({ rotation: value })}
-                min={0}
-                max={360}
-                step={1}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Opacidade: {Math.round(selectedElement.opacity * 100)}%</Label>
-              <Slider
-                value={[selectedElement.opacity * 100]}
-                onValueChange={([value]) => update({ opacity: value / 100 })}
-                min={0}
-                max={100}
-                step={1}
-              />
-            </div>
-          </div>
+          {/* Rotation & Opacity */}
+          <StyleProperties
+            rotation={selectedElement.rotation}
+            opacity={selectedElement.opacity}
+            onUpdate={update}
+          />
 
           <Separator />
 
           {/* Layer Order */}
-          <div className="space-y-2">
-            <Label className="text-xs">Ordem de Camada</Label>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => moveElementLayer(selectedElement.id, 'top')}
-              >
-                <ChevronsUp className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => moveElementLayer(selectedElement.id, 'up')}
-              >
-                <ChevronUp className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => moveElementLayer(selectedElement.id, 'down')}
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => moveElementLayer(selectedElement.id, 'bottom')}
-              >
-                <ChevronsDown className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          {/* Layer Order */}
+          <LayerProperties
+            onMoveLayer={(dir) => moveElementLayer(selectedElement.id, dir)}
+          />
 
           <Separator />
 
@@ -500,12 +326,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Início</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.start}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            start: parseInt(e.target.value) || 1
-                          }
+                        value={localValues.seqStart ?? selectedElement.customSequence.start}
+                        onChange={(e) => updateWithDebounce('seqStart', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              start: parseInt(val as string) || 1
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -514,12 +342,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Fim</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.end}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            end: parseInt(e.target.value) || 100
-                          }
+                        value={localValues.seqEnd ?? selectedElement.customSequence.end}
+                        onChange={(e) => updateWithDebounce('seqEnd', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              end: parseInt(val as string) || 100
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -528,12 +358,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Incremento</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.step}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            step: parseInt(e.target.value) || 1
-                          }
+                        value={localValues.seqStep ?? selectedElement.customSequence.step}
+                        onChange={(e) => updateWithDebounce('seqStep', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              step: parseInt(val as string) || 1
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -542,12 +374,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Zeros à Esquerda</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.padLength}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            padLength: parseInt(e.target.value) || 6
-                          }
+                        value={localValues.seqPadLength ?? selectedElement.customSequence.padLength}
+                        onChange={(e) => updateWithDebounce('seqPadLength', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              padLength: parseInt(val as string) || 6
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -829,12 +663,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Início</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.start}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            start: parseInt(e.target.value) || 1
-                          }
+                        value={localValues.seqStart ?? selectedElement.customSequence.start}
+                        onChange={(e) => updateWithDebounce('seqStart', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              start: parseInt(val as string) || 1
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -843,12 +679,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Fim</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.end}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            end: parseInt(e.target.value) || 100
-                          }
+                        value={localValues.seqEnd ?? selectedElement.customSequence.end}
+                        onChange={(e) => updateWithDebounce('seqEnd', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              end: parseInt(val as string) || 100
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -857,12 +695,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Incremento</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.step}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            step: parseInt(e.target.value) || 1
-                          }
+                        value={localValues.seqStep ?? selectedElement.customSequence.step}
+                        onChange={(e) => updateWithDebounce('seqStep', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              step: parseInt(val as string) || 1
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -871,12 +711,14 @@ export function PropertiesPanel() {
                       <Label className="text-xs">Zeros à Esquerda</Label>
                       <Input
                         type="number"
-                        value={selectedElement.customSequence.padLength}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            padLength: parseInt(e.target.value) || 6
-                          }
+                        value={localValues.seqPadLength ?? selectedElement.customSequence.padLength}
+                        onChange={(e) => updateWithDebounce('seqPadLength', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              padLength: parseInt(val as string) || 6
+                            }
+                          });
                         })}
                         className="h-8"
                       />
@@ -884,12 +726,14 @@ export function PropertiesPanel() {
                     <div>
                       <Label className="text-xs">Prefixo</Label>
                       <Input
-                        value={selectedElement.customSequence.prefix}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            prefix: e.target.value
-                          }
+                        value={localValues.prefix ?? selectedElement.customSequence.prefix}
+                        onChange={(e) => updateWithDebounce('prefix', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              prefix: val as string
+                            }
+                          });
                         })}
                         className="h-8"
                         placeholder="Ex: BAR-"
@@ -898,12 +742,14 @@ export function PropertiesPanel() {
                     <div>
                       <Label className="text-xs">Sufixo</Label>
                       <Input
-                        value={selectedElement.customSequence.suffix}
-                        onChange={(e) => update({
-                          customSequence: {
-                            ...selectedElement.customSequence!,
-                            suffix: e.target.value
-                          }
+                        value={localValues.suffix ?? selectedElement.customSequence.suffix}
+                        onChange={(e) => updateWithDebounce('suffix', e.target.value, (val) => {
+                          update({
+                            customSequence: {
+                              ...selectedElement.customSequence!,
+                              suffix: val as string
+                            }
+                          });
                         })}
                         className="h-8"
                         placeholder="Opcional"
@@ -994,97 +840,19 @@ export function PropertiesPanel() {
             </div>
           )}
 
-          {(selectedElement.type === 'rectangle' || selectedElement.type === 'circle') && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium">Forma</h3>
-              <div>
-                <Label className="text-xs">Preenchimento</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="color"
-                    value={selectedElement.shapeFill || '#ffffff'}
-                    onChange={(e) => update({ shapeFill: e.target.value })}
-                    className="h-8 w-12 p-1"
-                  />
-                  <Input
-                    value={selectedElement.shapeFill || '#ffffff'}
-                    onChange={(e) => update({ shapeFill: e.target.value })}
-                    className="h-8 flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">Cor da Borda</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="color"
-                    value={selectedElement.shapeStroke || '#000000'}
-                    onChange={(e) => update({ shapeStroke: e.target.value })}
-                    className="h-8 w-12 p-1"
-                  />
-                  <Input
-                    value={selectedElement.shapeStroke || '#000000'}
-                    onChange={(e) => update({ shapeStroke: e.target.value })}
-                    className="h-8 flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">Espessura da Borda: {selectedElement.shapeStrokeWidth}px</Label>
-                <Slider
-                  value={[selectedElement.shapeStrokeWidth || 1]}
-                  onValueChange={([value]) => update({ shapeStrokeWidth: value })}
-                  min={0}
-                  max={10}
-                  step={0.5}
-                />
-              </div>
-              {selectedElement.type === 'rectangle' && (
-                <div>
-                  <Label className="text-xs">Arredondamento: {selectedElement.cornerRadius || 0}mm</Label>
-                  <Slider
-                    value={[selectedElement.cornerRadius || 0]}
-                    onValueChange={([value]) => update({ cornerRadius: value })}
-                    min={0}
-                    max={20}
-                    step={0.5}
-                  />
-                </div>
-              )}
-            </div>
+          {(selectedElement.type === 'rectangle' || selectedElement.type === 'circle' || selectedElement.type === 'line') && (
+            <ShapeProperties
+              elementId={selectedElement.id}
+              type={selectedElement.type}
+              fill={selectedElement.shapeFill}
+              stroke={selectedElement.shapeStroke}
+              strokeWidth={selectedElement.shapeStrokeWidth}
+              cornerRadius={selectedElement.cornerRadius}
+              onUpdate={update}
+            />
           )}
 
-          {selectedElement.type === 'line' && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium">Linha</h3>
-              <div>
-                <Label className="text-xs">Cor</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="color"
-                    value={selectedElement.shapeStroke || '#000000'}
-                    onChange={(e) => update({ shapeStroke: e.target.value })}
-                    className="h-8 w-12 p-1"
-                  />
-                  <Input
-                    value={selectedElement.shapeStroke || '#000000'}
-                    onChange={(e) => update({ shapeStroke: e.target.value })}
-                    className="h-8 flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">Espessura: {selectedElement.shapeStrokeWidth}px</Label>
-                <Slider
-                  value={[selectedElement.shapeStrokeWidth || 1]}
-                  onValueChange={([value]) => update({ shapeStrokeWidth: value })}
-                  min={0.5}
-                  max={10}
-                  step={0.5}
-                />
-              </div>
-            </div>
-          )}
+
 
           {selectedElement.type === 'image' && (
             <div className="space-y-3">
