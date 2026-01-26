@@ -17,13 +17,14 @@ import { Header } from '@/components/editor/Header';
 import { ElementsSidebar } from '@/components/editor/ElementsSidebar';
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
 import { DataPanel } from '@/components/editor/DataPanel';
-import { Database, LayoutTemplate, Eye, ZoomIn, ZoomOut, Save } from 'lucide-react';
+import { Database, LayoutTemplate, Eye, ZoomIn, ZoomOut, Save, FolderOpen } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useLabelStore } from '@/store/labelStore';
 import { toast } from 'sonner';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { KeyboardShortcutsHelp } from '@/components/editor/KeyboardShortcutsHelp';
 import { PAPER_SIZES } from '@/types/label';
+import { ComponentLibrary } from '@/components/editor/ComponentLibrary';
 
 const Editor = () => {
   const { osId } = useParams<{ osId: string }>();
@@ -235,9 +236,9 @@ const Editor = () => {
 
         {/* Right Sidebar - Config & Properties */}
         <div className="w-80 border-l border-border flex flex-col bg-card h-full overflow-hidden">
-          {/* Tabs superiores - Props e Dados */}
+          {/* Tabs superiores - Props, Dados e Componentes */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="m-2 grid grid-cols-2 flex-shrink-0">
+            <TabsList className="m-2 grid grid-cols-3 flex-shrink-0">
               <TabsTrigger value="props" className="text-xs gap-1">
                 <LayoutTemplate className="h-3 w-3" />
                 Props
@@ -245,6 +246,10 @@ const Editor = () => {
               <TabsTrigger value="data" className="text-xs gap-1">
                 <Database className="h-3 w-3" />
                 Dados
+              </TabsTrigger>
+              <TabsTrigger value="components" className="text-xs gap-1">
+                <FolderOpen className="h-3 w-3" />
+                Biblioteca
               </TabsTrigger>
             </TabsList>
 
@@ -255,6 +260,9 @@ const Editor = () => {
               </TabsContent>
               <TabsContent value="data" className="m-0 p-3 h-full overflow-auto">
                 <DataPanel />
+              </TabsContent>
+              <TabsContent value="components" className="m-0 p-0 h-full overflow-hidden">
+                <ComponentLibrary />
               </TabsContent>
             </div>
           </Tabs>

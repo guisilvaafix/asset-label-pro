@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLabelStore } from '@/store/labelStore';
+import { toast } from 'sonner';
 
 interface KeyboardShortcutsOptions {
     onSave?: () => void;
@@ -18,6 +19,10 @@ interface KeyboardShortcutsOptions {
  * - Arrow Keys: Mover elemento selecionado
  * - Ctrl+S: Salvar (customizável)
  * - Ctrl+E: Exportar (customizável)
+ * - Ctrl+G: Agrupar elementos selecionados
+ * - Ctrl+Shift+G: Desagrupar elementos
+ * - Ctrl+Shift+C: Copiar estilo do elemento selecionado
+ * - Ctrl+Shift+V: Colar estilo nos elementos selecionados
  * 
  * Seleção múltipla:
  * - Shift+Click: Adicionar/remover elementos da seleção
@@ -39,6 +44,10 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         removeElements,
         updateElement,
         elements,
+        groupElements,
+        ungroupElements,
+        copyStyle,
+        pasteStyle,
     } = useLabelStore();
 
     useEffect(() => {
@@ -118,6 +127,53 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
                 return;
             }
 
+            // Ctrl+G - Agrupar elementos
+            if (ctrlKey && e.key === 'g' && !e.shiftKey) {
+                e.preventDefault();
+                if (selectedElementIds.length >= 2) {
+                    groupElements(selectedElementIds);
+                    toast.success(`${selectedElementIds.length} elementos agrupados`);
+                }
+                return;
+            }
+
+            // Ctrl+Shift+G - Desagrupar elementos
+            if (ctrlKey && e.shiftKey && e.key === 'G') {
+                e.preventDefault();
+                // Encontrar o groupId dos elementos selecionados
+                const selectedElements = elements.filter(el => selectedElementIds.includes(el.id));
+                const groupIds = [...new Set(selectedElements.map(el => el.groupId).filter(Boolean))];
+
+                if (groupIds.length > 0) {
+                    groupIds.forEach(groupId => {
+                        if (groupId) ungroupElements(groupId);
+                    });
+                    toast.success('Elementos desagrupados');
+                }
+                return;
+            }
+
+            // Ctrl+Shift+C - Copiar estilo
+            if (ctrlKey && e.shiftKey && e.key === 'C') {
+                e.preventDefault();
+                if (selectedElementId) {
+                    copyStyle(selectedElementId);
+                    toast.success('Estilo copiado');
+                }
+                return;
+            }
+
+            // Ctrl+Shift+V - Colar estilo
+            if (ctrlKey && e.shiftKey && e.key === 'V') {
+                e.preventDefault();
+                const targetIds = selectedElementIds.length > 0 ? selectedElementIds : (selectedElementId ? [selectedElementId] : []);
+                if (targetIds.length > 0) {
+                    pasteStyle(targetIds);
+                    toast.success(`Estilo aplicado em ${targetIds.length} elemento(s)`);
+                }
+                return;
+            }
+
             // Arrow Keys - Mover elemento
             if (selectedElementId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                 e.preventDefault();
@@ -168,6 +224,10 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         removeElements,
         updateElement,
         elements,
+        groupElements,
+        ungroupElements,
+        copyStyle,
+        pasteStyle,
         onSave,
         onExport,
     ]);

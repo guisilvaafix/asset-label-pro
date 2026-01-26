@@ -8,7 +8,9 @@ import {
   DataRow,
   ExportConfig,
   PAPER_SIZES,
-  CSVImport
+  CSVImport,
+  ComponentLibraryItem,
+  ComponentCategory
 } from '@/types/label';
 import { labelElementSchema, sheetConfigSchema, sequentialConfigSchema } from '@/schemas/labelSchemas';
 import { validateData } from '@/utils/validation';
@@ -36,6 +38,16 @@ interface LabelState {
   duplicateElements: (ids: string[]) => void; // Duplicar múltiplos
   moveElementLayer: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
 
+  // Groups
+  groupElements: (ids: string[]) => void;
+  ungroupElements: (groupId: string) => void;
+  getGroupElements: (groupId: string) => LabelElement[];
+
+  // Style clipboard
+  copiedStyle: Partial<LabelElement> | null;
+  copyStyle: (id: string) => void;
+  pasteStyle: (ids: string[]) => void;
+
   // Data generation
   dataMode: 'sequential' | 'csv';
   setDataMode: (mode: 'sequential' | 'csv') => void;
@@ -60,6 +72,14 @@ interface LabelState {
   saveTemplate: (name: string) => void;
   loadTemplate: (id: string) => void;
   deleteTemplate: (id: string) => void;
+
+  // Component Library
+  componentLibrary: ComponentLibraryItem[];
+  saveAsComponent: (name: string, category: ComponentCategory, elementIds: string[], tags?: string[]) => void;
+  loadComponent: (componentId: string) => void;
+  deleteComponent: (componentId: string) => void;
+  searchComponents: (query: string) => ComponentLibraryItem[];
+  filterComponentsByCategory: (category: ComponentCategory) => ComponentLibraryItem[];
 
   // Export
   exportConfig: ExportConfig;
@@ -303,11 +323,12 @@ export const useLabelStore = create<LabelState>()(
 
         if (elementsToDuplicate.length === 0) return;
 
+        // Offset de 5mm para evitar sobreposição
         const newElements = elementsToDuplicate.map((element) => ({
           ...element,
           id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          x: element.x + 2,
-          y: element.y + 2,
+          x: element.x + 5,
+          y: element.y + 5,
         }));
 
         const allElements = [...state.elements, ...newElements];
@@ -327,11 +348,12 @@ export const useLabelStore = create<LabelState>()(
         const state = get();
         const element = state.elements.find((el) => el.id === id);
         if (element) {
+          // Offset de 5mm para evitar sobreposição
           const newElement = {
             ...element,
             id: `${element.type}-${Date.now()}`,
-            x: element.x + 2,
-            y: element.y + 2,
+            x: element.x + 5,
+            y: element.y + 5,
           };
           const newElements = [...state.elements, newElement];
           const newHistory = state.history.slice(0, state.historyIndex + 1);
@@ -343,6 +365,105 @@ export const useLabelStore = create<LabelState>()(
             historyIndex: Math.min(newHistory.length - 1, 49),
           });
         }
+      },
+
+      // Groups
+      groupElements: (ids) => {
+        if (ids.length < 2) return; // Precisa de pelo menos 2 elementos
+
+        const groupId = `group-${Date.now()}`;
+
+        set((state) => {
+          const newElements = state.elements.map((el) =>
+            ids.includes(el.id) ? { ...el, groupId } : el
+          );
+
+          const newHistory = state.history.slice(0, state.historyIndex + 1);
+          newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+          return {
+            elements: newElements,
+            history: newHistory.slice(-50),
+            historyIndex: Math.min(newHistory.length - 1, 49),
+          };
+        });
+      },
+
+      ungroupElements: (groupId) => {
+        set((state) => {
+          const newElements = state.elements.map((el) =>
+            el.groupId === groupId ? { ...el, groupId: undefined } : el
+          );
+
+          const newHistory = state.history.slice(0, state.historyIndex + 1);
+          newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+          return {
+            elements: newElements,
+            history: newHistory.slice(-50),
+            historyIndex: Math.min(newHistory.length - 1, 49),
+          };
+        });
+      },
+
+      getGroupElements: (groupId) => {
+        return get().elements.filter((el) => el.groupId === groupId);
+      },
+
+      // Style clipboard
+      copiedStyle: null,
+
+      copyStyle: (id) => {
+        const state = get();
+        const element = state.elements.find((el) => el.id === id);
+        if (!element) return;
+
+        // Copiar apenas propriedades de estilo (não posição, tamanho, id, etc.)
+        const styleToCopy: Partial<LabelElement> = {
+          // Text styles
+          fontFamily: element.fontFamily,
+          fontSize: element.fontSize,
+          fontWeight: element.fontWeight,
+          fontStyle: element.fontStyle,
+          fill: element.fill,
+          textAlign: element.textAlign,
+          shadow: element.shadow,
+          shadowColor: element.shadowColor,
+          shadowBlur: element.shadowBlur,
+          stroke: element.stroke,
+          strokeWidth: element.strokeWidth,
+          // Shape styles
+          shapeFill: element.shapeFill,
+          shapeStroke: element.shapeStroke,
+          shapeStrokeWidth: element.shapeStrokeWidth,
+          cornerRadius: element.cornerRadius,
+          // General
+          opacity: element.opacity,
+          rotation: element.rotation,
+          // QR Code styles
+          qrForeground: element.qrForeground,
+          qrBackground: element.qrBackground,
+        };
+
+        set({ copiedStyle: styleToCopy });
+      },
+
+      pasteStyle: (ids) => {
+        const state = get();
+        if (!state.copiedStyle || ids.length === 0) return;
+
+        const newElements = state.elements.map((el) =>
+          ids.includes(el.id) ? { ...el, ...state.copiedStyle } : el
+        );
+
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(newElements)));
+
+        set({
+          elements: newElements,
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        });
       },
 
       moveElementLayer: (id, direction) => set((state) => {
@@ -525,6 +646,88 @@ export const useLabelStore = create<LabelState>()(
         currentTemplateId: state.currentTemplateId === id ? null : state.currentTemplateId,
       })),
 
+      // Component Library
+      componentLibrary: [],
+
+      saveAsComponent: (name, category, elementIds, tags = []) => {
+        const state = get();
+        const elementsToSave = state.elements.filter(el => elementIds.includes(el.id));
+
+        if (elementsToSave.length === 0) return;
+
+        // Normalizar posições (mover para 0,0 relativo)
+        const minX = Math.min(...elementsToSave.map(el => el.x));
+        const minY = Math.min(...elementsToSave.map(el => el.y));
+
+        const normalizedElements = elementsToSave.map(el => ({
+          ...el,
+          id: `${el.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Novo ID
+          x: el.x - minX,
+          y: el.y - minY,
+        }));
+
+        const component: ComponentLibraryItem = {
+          id: `component-${Date.now()}`,
+          name,
+          category,
+          elements: normalizedElements,
+          createdAt: new Date().toISOString(),
+          tags,
+        };
+
+        set((state) => ({
+          componentLibrary: [...state.componentLibrary, component],
+        }));
+      },
+
+      loadComponent: (componentId) => {
+        const state = get();
+        const component = state.componentLibrary.find(c => c.id === componentId);
+
+        if (!component) return;
+
+        // Adicionar elementos do componente ao canvas
+        // Posicionar no centro ou em posição livre
+        const newElements = component.elements.map(el => ({
+          ...el,
+          id: `${el.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          x: el.x + 10, // Offset para não sobrepor
+          y: el.y + 10,
+        }));
+
+        const allElements = [...state.elements, ...newElements];
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(JSON.parse(JSON.stringify(allElements)));
+
+        set({
+          elements: allElements,
+          selectedElementIds: newElements.map(el => el.id),
+          selectedElementId: newElements.length === 1 ? newElements[0].id : null,
+          history: newHistory.slice(-50),
+          historyIndex: Math.min(newHistory.length - 1, 49),
+        });
+      },
+
+      deleteComponent: (componentId) => set((state) => ({
+        componentLibrary: state.componentLibrary.filter(c => c.id !== componentId),
+      })),
+
+      searchComponents: (query) => {
+        const state = get();
+        const lowerQuery = query.toLowerCase();
+
+        return state.componentLibrary.filter(component =>
+          component.name.toLowerCase().includes(lowerQuery) ||
+          component.category.toLowerCase().includes(lowerQuery) ||
+          component.tags?.some(tag => tag.toLowerCase().includes(lowerQuery))
+        );
+      },
+
+      filterComponentsByCategory: (category) => {
+        const state = get();
+        return state.componentLibrary.filter(c => c.category === category);
+      },
+
       // Export
       exportConfig: defaultExportConfig,
       setExportConfig: (config) => set((state) => ({
@@ -586,6 +789,7 @@ export const useLabelStore = create<LabelState>()(
       partialize: (state) => ({
         templates: state.templates,
         exportConfig: state.exportConfig,
+        componentLibrary: state.componentLibrary,
       }),
     }
   )

@@ -11,10 +11,14 @@ import {
   AlignCenter,
   AlignRight,
   Bold,
-  Italic
+  Italic,
+  Group,
+  Ungroup,
+  Clipboard,
+  ClipboardPaste
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { useSelectedElement, useElementUpdate, useLocalValues } from '@/hooks/usePropertiesOptimization';
+import { useCallback, useEffect, useRef, useState, useMemo, memo } from 'react';
+import { useSelectedElement, useElementUpdate, useLocalValues, useStoreData } from '@/hooks/usePropertiesOptimization';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,23 +49,29 @@ const FONT_FAMILIES = [
 ];
 
 export function PropertiesPanel() {
-  // Optimized hooks to prevent re-renders
+  // Optimized hooks to prevent re-renders when canvas changes
   const selectedElementId = useLabelStore((state) => state.selectedElementId);
+  const selectedElementIds = useLabelStore((state) => state.selectedElementIds);
   const selectedElement = useSelectedElement();
   const update = useElementUpdate();
-  const { localValues, updateWithDebounce } = useLocalValues(selectedElementId);
+  const { localValues, updateWithDebounce, flushValue, updateTimeoutRef } = useLocalValues(selectedElementId);
 
-  // Get store functions directly (stable references)
+  // Get store functions directly (stable references - não causa re-render)
   const removeElement = useLabelStore.getState().removeElement;
   const duplicateElement = useLabelStore.getState().duplicateElement;
   const moveElementLayer = useLabelStore.getState().moveElementLayer;
+  const groupElements = useLabelStore.getState().groupElements;
+  const ungroupElements = useLabelStore.getState().ungroupElements;
+  const copyStyle = useLabelStore.getState().copyStyle;
+  const pasteStyle = useLabelStore.getState().pasteStyle;
+  const copiedStyle = useLabelStore((state) => state.copiedStyle);
 
-  // Get data for child components (memoized)
-  const sequentialConfig = useLabelStore((state) => state.sequentialConfig);
-  const csvHeaders = useLabelStore((state) => state.csvHeaders);
-  const csvImports = useLabelStore((state) => state.csvImports);
-  const getCsvImport = useLabelStore((state) => state.getCsvImport);
-  const elements = useLabelStore((state) => state.elements);
+  // Get data for child components using hook
+  const { sequentialConfig, csvHeaders, csvImports, getCsvImport, elements } = useStoreData();
+
+  // Check if element is in a group
+  const isGrouped = selectedElement?.groupId !== undefined;
+  const canGroup = selectedElementIds.length >= 2;
 
   if (!selectedElement) {
     return (
@@ -81,7 +91,7 @@ export function PropertiesPanel() {
   return (
     <aside className="w-72 border-l border-border bg-card flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-border flex-shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <h2 className="font-semibold capitalize">{selectedElement.type}</h2>
           <div className="flex items-center gap-1">
             <Button
@@ -89,6 +99,7 @@ export function PropertiesPanel() {
               size="icon"
               className="h-8 w-8"
               onClick={() => update({ locked: !selectedElement.locked })}
+              title={selectedElement.locked ? "Desbloquear" : "Bloquear"}
             >
               {selectedElement.locked ? (
                 <Lock className="h-4 w-4" />
@@ -101,6 +112,7 @@ export function PropertiesPanel() {
               size="icon"
               className="h-8 w-8"
               onClick={() => duplicateElement(selectedElement.id)}
+              title="Duplicar (Ctrl+D)"
             >
               <Copy className="h-4 w-4" />
             </Button>
@@ -109,10 +121,60 @@ export function PropertiesPanel() {
               size="icon"
               className="h-8 w-8 text-destructive hover:text-destructive"
               onClick={() => removeElement(selectedElement.id)}
+              title="Remover (Delete)"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+
+        {/* Botões de Grupo e Estilo */}
+        <div className="flex gap-1">
+          {canGroup && !isGrouped && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-7 text-xs gap-1"
+              onClick={() => groupElements(selectedElementIds)}
+              title="Agrupar elementos (Ctrl+G)"
+            >
+              <Group className="h-3 w-3" />
+              Agrupar
+            </Button>
+          )}
+          {isGrouped && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-7 text-xs gap-1"
+              onClick={() => ungroupElements(selectedElement.groupId!)}
+              title="Desagrupar (Ctrl+Shift+G)"
+            >
+              <Ungroup className="h-3 w-3" />
+              Desagrupar
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 h-7 text-xs gap-1"
+            onClick={() => copyStyle(selectedElement.id)}
+            title="Copiar estilo (Ctrl+Shift+C)"
+          >
+            <Clipboard className="h-3 w-3" />
+            Copiar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 h-7 text-xs gap-1"
+            onClick={() => pasteStyle(selectedElementIds.length > 0 ? selectedElementIds : [selectedElement.id])}
+            disabled={!copiedStyle}
+            title="Colar estilo (Ctrl+Shift+V)"
+          >
+            <ClipboardPaste className="h-3 w-3" />
+            Colar
+          </Button>
         </div>
       </div>
 
@@ -126,6 +188,7 @@ export function PropertiesPanel() {
             y={selectedElement.y}
             width={selectedElement.width}
             height={selectedElement.height}
+            lockAspectRatio={selectedElement.lockAspectRatio}
             onUpdate={update}
           />
 

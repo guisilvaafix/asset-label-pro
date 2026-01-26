@@ -10,8 +10,14 @@ No editor, clique no botão **"Atalhos"** (ícone de teclado) no canto superior 
 #### Edição
 - **Ctrl + Z**: Desfazer última ação
 - **Ctrl + Y**: Refazer ação desfeita
-- **Ctrl + D**: Duplicar elemento selecionado
+- **Ctrl + D**: Duplicar elemento selecionado (com offset de 5mm)
 - **Delete**: Remover elemento selecionado
+
+#### Organização ⭐ NOVO
+- **Ctrl + G**: Agrupar elementos selecionados
+- **Ctrl + Shift + G**: Desagrupar elementos
+- **Ctrl + Shift + C**: Copiar estilo do elemento
+- **Ctrl + Shift + V**: Colar estilo em elemento(s)
 
 #### Movimentação
 - **Setas (← → ↑ ↓)**: Mover elemento 1mm
@@ -25,6 +31,7 @@ No editor, clique no botão **"Atalhos"** (ícone de teclado) no canto superior 
 - Os atalhos funcionam apenas quando você não está digitando em campos de texto
 - No Mac, use **⌘** (Command) ao invés de Ctrl
 - Combine **Shift** com as setas para movimentos mais rápidos
+- Use **Ctrl+Shift+C/V** para aplicar o mesmo estilo em múltiplos elementos rapidamente
 
 ---
 
@@ -40,6 +47,36 @@ Se algo der errado, você verá uma tela amigável com:
 - Descrição do erro
 - Opção para tentar novamente
 - Opção para recarregar a página
+
+---
+
+## ⭐ Novas Funcionalidades
+
+### Grupos de Elementos
+Organize elementos relacionados em grupos para facilitar a edição:
+- Selecione 2+ elementos e pressione **Ctrl+G** para agrupar
+- Elementos agrupados podem ser movidos juntos
+- Use **Ctrl+Shift+G** para desagrupar
+
+### Copiar/Colar Estilos
+Aplique o mesmo visual em múltiplos elementos:
+1. Selecione um elemento com o estilo desejado
+2. Pressione **Ctrl+Shift+C** para copiar o estilo
+3. Selecione outro(s) elemento(s)
+4. Pressione **Ctrl+Shift+V** para aplicar
+
+**Estilos copiados**: fontes, cores, sombras, opacidade, bordas, etc.
+
+### Bloqueio de Proporções
+Evite distorções ao redimensionar:
+- No painel "Posição e Tamanho", clique em "Proporções Livres"
+- Ao alterar largura, a altura ajusta automaticamente (e vice-versa)
+- Ideal para logos, QR Codes e imagens
+
+### Duplicação Inteligente
+- Elementos duplicados aparecem com offset de 5mm
+- Não ficam mais sobrepostos!
+- Use **Ctrl+D** para duplicar rapidamente
 
 ---
 

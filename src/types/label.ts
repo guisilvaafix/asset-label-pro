@@ -26,6 +26,9 @@ export interface LabelElement {
   opacity: number;
   zIndex: number;
   locked: boolean;
+  // Group properties
+  groupId?: string;             // ID do grupo ao qual este elemento pertence
+  lockAspectRatio?: boolean;    // Bloquear proporções ao redimensionar
   // Text properties
   text?: string;
   fontFamily?: string;
@@ -127,6 +130,33 @@ export interface LabelTemplate {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ComponentLibraryItem {
+  id: string;
+  name: string;
+  category: string;
+  elements: LabelElement[]; // Pode ser um ou múltiplos elementos
+  thumbnail?: string; // Base64 da preview
+  createdAt: string;
+  tags?: string[];
+}
+
+export type ComponentCategory =
+  | 'logos'
+  | 'textos'
+  | 'codigos'
+  | 'formas'
+  | 'layouts'
+  | 'outros';
+
+export const COMPONENT_CATEGORIES: { value: ComponentCategory; label: string; icon: string }[] = [
+  { value: 'logos', label: 'Logos', icon: 'Image' },
+  { value: 'textos', label: 'Textos', icon: 'Type' },
+  { value: 'codigos', label: 'Códigos', icon: 'QrCode' },
+  { value: 'formas', label: 'Formas', icon: 'Shapes' },
+  { value: 'layouts', label: 'Layouts', icon: 'LayoutTemplate' },
+  { value: 'outros', label: 'Outros', icon: 'Folder' },
+];
 
 export interface ExportConfig {
   format: 'pdf' | 'png' | 'pdf-single';

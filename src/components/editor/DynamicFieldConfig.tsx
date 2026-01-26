@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 
 interface DynamicFieldConfigProps {
     element: LabelElement;
-    allElements: LabelElement[]; // Todos os elementos para listar QR/Barcodes
+    allElements: LabelElement[];
     csvImports: CSVImport[];
     sequentialConfig: SequentialConfig;
     getCsvImport: (id: string) => CSVImport | undefined;
